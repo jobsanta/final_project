@@ -85,6 +85,7 @@
     <ClInclude Include="d3dUtil.h" />
     <ClInclude Include="graphic.h" />
     <ClInclude Include="final_project.h" />
+    <ClInclude Include="kinect_handle.h" />
     <ClInclude Include="nvStereo.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
@@ -95,6 +96,7 @@
     <ClCompile Include="Box.cpp" />
     <ClCompile Include="graphic.cpp" />
     <ClCompile Include="final_project.cpp" />
+    <ClCompile Include="kinect_handle.cpp" />
     <ClCompile Include="nvStereo.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

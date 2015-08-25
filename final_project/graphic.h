@@ -41,7 +41,7 @@ public:
 
 	Graphic();
 	~Graphic();
-	void Initialize(HWND);
+	bool Initialize(HWND);
 	void Render();
 
 private:

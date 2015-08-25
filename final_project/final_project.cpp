@@ -38,14 +38,29 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	MyRegisterClass(hInstance);
 
 	// Perform application initialization:
-	if (!InitInstance (hInstance, nCmdShow))
+
+	HWND hWnd;
+
+	hInst = hInstance; // Store instance handle in our global variable
+
+	hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, GetDesktopWindow(), NULL, hInstance, NULL);
+
+	if (!hWnd)
 	{
-		return FALSE;
+		return 0;
 	}
+
+	//ShowWindow(hWnd, nCmdShow);
+	//UpdateWindow(hWnd);
 
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_FINAL_PROJECT));
 
-	g_graphic.Initialize();
+	
+	if (! g_graphic.Initialize(hWnd))
+	{
+		return 0;
+	}
 
 	// Main message loop:
 	while (GetMessage(&msg, NULL, 0, 0))
@@ -55,8 +70,11 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
+		if (hWnd != NULL)
+		{
+			g_graphic.Render();
+		}
 	}
-
 	return (int) msg.wParam;
 }
 
@@ -73,7 +91,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
 
-	wcex.style			= CS_HREDRAW | CS_VREDRAW;
+	wcex.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
 	wcex.lpfnWndProc	= WndProc;
 	wcex.cbClsExtra		= 0;
 	wcex.cbWndExtra		= 0;
@@ -85,38 +103,9 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	wcex.lpszClassName	= szWindowClass;
 	wcex.hIconSm		= LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
-	return RegisterClassEx(&wcex);
+	return RegisterClassEx(&wcex);//RegisterClassEx(&wcex);
 }
 
-//
-//   FUNCTION: InitInstance(HINSTANCE, int)
-//
-//   PURPOSE: Saves instance handle and creates main window
-//
-//   COMMENTS:
-//
-//        In this function, we save the instance handle in a global variable and
-//        create and display the main program window.
-//
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
-{
-   HWND hWnd;
-
-   hInst = hInstance; // Store instance handle in our global variable
-
-   hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-	   CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, GetDesktopWindow(), NULL, hInstance, NULL);
-
-   if (!hWnd)
-   {
-      return FALSE;
-   }
-
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
-
-   return TRUE;
-}
 
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)

@@ -10,10 +10,13 @@ Graphic::~Graphic()
 	FreeDevice();
 }
 
-void Graphic::Initialize(HWND g_hWnd)
+bool Graphic::Initialize(HWND g_hWnd)
 {
-	CreateDevice(g_hWnd);
-	InitializePhysX();
+	if (!CreateDevice(g_hWnd))
+	{
+		return false;
+	}
+	//InitializePhysX();
 }
 
 void Graphic::buildFX()
@@ -140,9 +143,9 @@ bool Graphic::CreateDevice(HWND g_hWnd)
 	g_DXGISwapChainDesc.SampleDesc.Count = 1;
 	g_DXGISwapChainDesc.SampleDesc.Quality = 0;
 
-	// WINDOWED mode
+	// Fullscreen mode mode
 	g_DXGISwapChainDesc.Windowed = FALSE;
-	g_DXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = devMode.dmDisplayFrequency;
+	//g_DXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = devMode.dmDisplayFrequency;
 	g_DXGISwapChainDesc.BufferDesc.Width = devMode.dmPelsWidth;
 	g_DXGISwapChainDesc.BufferDesc.Height = devMode.dmPelsHeight;
 
@@ -248,6 +251,16 @@ bool Graphic::CreateDevice(HWND g_hWnd)
 	float fAspectRatio = (FLOAT)g_D3D10MainViewport.Width / (FLOAT)g_D3D10MainViewport.Height;
 	D3DXMatrixPerspectiveFovLH(&mProj, D3DX_PI / 4, fAspectRatio, Near, Far);
 
+
+	// Create 3D models that will use
+	mBox.init(g_D3D10Device, 0.5f);
+	terrain.Initialize(g_D3D10Device);
+
+
+	// Simple FX and layout
+	buildFX();
+	buildVertexLayouts();
+
 	return true;
 }
 
@@ -340,19 +353,19 @@ void Graphic::Render()
 		}
 
 
-		//D3DXMATRIX mat;
-		//D3DXMatrixTranslation(&mat, -50.0, 0.0, -50.0);
-		//mWVP = mat* mView*mProj;
-		//mfxWVPVar->SetMatrix((float*)&mWVP);
-		////terrain.Render(g_D3D10Device);
-		//D3D10_TECHNIQUE_DESC techDesc;
-		//mTech->GetDesc(&techDesc);
-		//for (UINT p = 0; p < techDesc.Passes; ++p)
-		//{
-		//	mTech->GetPassByIndex(p)->Apply(0);
+		D3DXMATRIX mat;
+		D3DXMatrixTranslation(&mat, -50.0, 0.0, -50.0);
+		mWVP = mat* mView*mProj;
+		mfxWVPVar->SetMatrix((float*)&mWVP);
+		terrain.Render(g_D3D10Device);
+		D3D10_TECHNIQUE_DESC techDesc;
+		mTech->GetDesc(&techDesc);
+		for (UINT p = 0; p < techDesc.Passes; ++p)
+		{
+			mTech->GetPassByIndex(p)->Apply(0);
 
-		////	g_D3D10Device->DrawIndexed(terrain.GetIndexCount(), 0, 0);
-		//}
+			g_D3D10Device->DrawIndexed(terrain.GetIndexCount(), 0, 0);
+		}
 
 
 
