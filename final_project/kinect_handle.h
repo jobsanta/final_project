@@ -1,3 +1,6 @@
+
+#include <iostream>
+
 // Kinect Library
 #include <Kinect.h>
 #include <Kinect.Face.h>
@@ -7,9 +10,33 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/gpu/gpu.hpp"
 
+//-- Physx Library
+#include <PxPhysicsAPI.h>
+#include <PxExtensionsAPI.h>
+#include <PxDefaultErrorCallback.h>
+#include <PxDefaultAllocator.h>
+#include <PxDefaultSimulationFilterShader.h>
+#include <PxDefaultCpuDispatcher.h>
+#include <PxShapeExt.h>
+#include <PxMat33.h>
+#include <PxSimpleFactory.h>
+#include <vector>
+#include <PxVisualDebuggerExt.h>
+
+#define PI 3.14159265
+
 using namespace std;
 using namespace cv;
 using namespace cv::gpu;
+using namespace physx;
+
+struct Particle
+{
+	float x;
+	float y;
+	float Depth;
+};
+
 
 class KinectHandle
 {
@@ -22,36 +49,27 @@ class KinectHandle
 	static const int		factor = 6;
 
 
-	// define the face frame features required to be computed by this application
-	static const DWORD c_FaceFrameFeatures =
-		FaceFrameFeatures::FaceFrameFeatures_BoundingBoxInColorSpace
-		| FaceFrameFeatures::FaceFrameFeatures_PointsInColorSpace
-		| FaceFrameFeatures::FaceFrameFeatures_RotationOrientation
-		| FaceFrameFeatures::FaceFrameFeatures_Happy
-		| FaceFrameFeatures::FaceFrameFeatures_RightEyeClosed
-		| FaceFrameFeatures::FaceFrameFeatures_LeftEyeClosed
-		| FaceFrameFeatures::FaceFrameFeatures_MouthOpen
-		| FaceFrameFeatures::FaceFrameFeatures_MouthMoved
-		| FaceFrameFeatures::FaceFrameFeatures_LookingAway
-		| FaceFrameFeatures::FaceFrameFeatures_Glasses
-		| FaceFrameFeatures::FaceFrameFeatures_FaceEngagement;
 
 
 
 public: 
-	KinectHandle();
-	~KinectHandle();
-
-	HRESULT CreateFirstConnected();
-	HRESULT	InitOpenCV();
-
 	// Kinect
 	IKinectSensor*     m_pKinectSensor;
 	ICoordinateMapper* m_pCoordinateMapper;
 	DepthSpacePoint*   m_pDepthCoordinates;
 
 	Mat	referenceFrame;
-	Mat Last_u, Last_v;
+	Mat LastGrayFrame;
+	Mat Last_u;
+	Mat	Last_v;
+
+	PxPhysics* gPhysicsSDK;
+	PxScene*   gScene = NULL;
+
+	vector<PxRigidActor*> proxyParticleActor;
+	std::vector<Particle> proxyParticle;
+	bool gotFace;
+
 
 	// to prevent drawing until we have data for both streams
 	bool m_bDepthReceived;
@@ -67,11 +85,26 @@ public:
 	IFaceFrameResult*      pFaceFrameResult;
 	IMultiSourceFrameReader* m_pMultiSourceFrameReader;
 
-	// For mapping depth to color
-	RGBQUAD*	m_pColorRGBX;
+	// For   mapping depth to color
+	RGBQUAD* m_pColorRGBX;
+	RGBQUAD* m_pOutputRGBX;
+	RGBQUAD* m_pBackgroundRGBX;
+	BYTE*	 m_pBodyIndex;
+
+
+	KinectHandle();
+	~KinectHandle();
+	
+	HRESULT Initialize(PxPhysics* sdk, PxScene* scene);
+	HRESULT CreateFirstConnected();
+	HRESULT	InitOpenCV();
+	void	InitPhysx(PxPhysics* sdk, PxScene* scene);
 
 	HRESULT	ProcessColor(int nBufferSize);
-	HRESULT KinectRead();
+	HRESULT KinectProcess();
+
+	
+
 
 	void	RenderParticle();
 	void	UpdateParticle(Mat& u, Mat& v);
@@ -82,9 +115,34 @@ public:
 			const BYTE* pBodyIndexBuffer, int nBodyIndexWidth, int nBodyIndexHeight, Mat& u, Mat& v);
 
 	void	CloseKinect();
+	void	CloseOpenCV();
+	void	ParticleCompute();
+	BOOLEAN ProcessFaces(IMultiSourceFrame* pMultiFrame);
+
+	HRESULT UpdateBodyData(IBody** ppBodies, IMultiSourceFrame* pMultiFrame);
+	
+	vector<PxRigidActor*> getProxyParticle();
+	void	getFaceResult(float*, float*, float*);
+
+
+	PxRigidDynamic* CreateSphere(const PxVec3& pos, const PxReal radius, const PxReal density);
+
+private:
+	LONG                                m_depthWidth;
+	LONG                                m_depthHeight;
+
+	LONG                                m_colorWidth;
+	LONG                                m_colorHeight;
+
+	LONG                                m_colorToDepthDivisor;
+
+	float								face_x;
+	float								face_y;
+	float								face_z;
 
 
 };
+
 
 
 // Safe release for interfaces
@@ -97,3 +155,4 @@ inline void SafeRelease(Interface *& pInterfaceToRelease)
 		pInterfaceToRelease = NULL;
 	}
 }
+

@@ -4,6 +4,8 @@
 #include "stdafx.h"
 #include "final_project.h"
 #include "graphic.h"
+#include "kinect_handle.h"
+#include "smooth_filter.h"
 
 #define MAX_LOADSTRING 100
 
@@ -12,7 +14,16 @@ HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 
+float currentX = 0;
+float currentY = 0;
+float currentZ = 0;
+float speed = 0.05f;
+
 Graphic g_graphic;
+KinectHandle kinect_handle;
+SmoothFilter smooth_x;
+SmoothFilter smooth_y;
+SmoothFilter smooth_z;
 
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
@@ -61,20 +72,58 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	{
 		return 0;
 	}
-
-	// Main message loop:
-	while (GetMessage(&msg, NULL, 0, 0))
+	if (FAILED(kinect_handle.Initialize(g_graphic.getPhysicsSDK(), g_graphic.getScene())))
 	{
-		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+		return 0;
+	}
+
+	
+
+	//// Main message loop:
+	//while (GetMessage(&msg, NULL, 0, 0))
+	//{
+	//	if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+	//	{
+	//		TranslateMessage(&msg);
+	//		DispatchMessage(&msg);
+	//	}
+	//	if (hWnd != NULL)
+	//	{
+	//		kinect_handle.KinectProcess();
+	//		g_graphic.Render();
+	//	}
+	//}
+	float x, y, z;
+	kinect_handle.getFaceResult(&x, &y, &z);
+	currentX = x;
+	currentY = y;
+	currentZ = z;
+	// Main message loop
+	msg = { 0 };
+	while (WM_QUIT != msg.message)
+	{
+		if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
-			DispatchMessage(&msg);
+			DispatchMessageW(&msg);
 		}
-		if (hWnd != NULL)
+		else
 		{
-			g_graphic.Render();
+			HRESULT hr = kinect_handle.KinectProcess();
+			vector<PxRigidActor*> proxyParticleActor = kinect_handle.getProxyParticle();
+			kinect_handle.getFaceResult(&x, &y, &z);
+			
+			currentX = smooth_x.update(x);
+			currentY = smooth_y.update(y);
+			currentZ = smooth_z.update(z);
+
+
+			g_graphic.SetProxyActor(proxyParticleActor);
+			g_graphic.Render(currentX,currentY,currentZ);
+
 		}
 	}
+
 	return (int) msg.wParam;
 }
 

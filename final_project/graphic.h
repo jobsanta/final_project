@@ -17,6 +17,8 @@
 #include "d3dUtil.h"
 #include <iostream>
 
+#include <Optional\DXUTShapes.h>
+
 #include "Box.h"
 
 
@@ -39,10 +41,15 @@ class Graphic
 {
 public:
 
+	float BoxSize = 1.0f;
+
 	Graphic();
 	~Graphic();
 	bool Initialize(HWND);
-	void Render();
+	void Render(float,float,float);
+	PxScene* getScene();
+	void SetProxyActor(vector<PxRigidActor*>);
+	PxPhysics* getPhysicsSDK();
 
 private:
 
@@ -62,10 +69,15 @@ private:
 	D3D10_VIEWPORT            g_D3D10MainViewport;
 	ID3D10ShaderResourceView* g_D3D10DepthBufferSRV;
 
-	ID3D10Effect*               mFX;
-	ID3D10EffectTechnique*      mTech;
+	ID3D10Effect*               mFX_Box;
+	ID3D10EffectTechnique*      mTech_Box;
+	ID3D10EffectMatrixVariable* mfxWVPVar_Box;
+
+	ID3D10Effect*               mFX_Sphere;
+	ID3D10EffectTechnique*      mTech_Sphere;
+	ID3D10EffectMatrixVariable* mfxWVPVar_Sphere;
+
 	ID3D10InputLayout*          mVertexLayout;
-	ID3D10EffectMatrixVariable* mfxWVPVar;
 
 	D3DXMATRIX mView;
 	D3DXMATRIX mProj;
@@ -79,15 +91,21 @@ private:
 	PxFoundation*             gFoundation = NULL;
 
 	PxScene*              gScene = NULL;
-	PxReal                myTimestep = 1.0f / 1000.0f;
+	PxReal                myTimestep = 1.0f / 10.0f;
 	vector<PxRigidActor*> boxes;
+	vector<PxRigidActor*> proxyParticle;
 	PxDistanceJoint*      gMouseJoint = NULL;
 	PxRigidDynamic*       gMouseSphere = NULL;
 	PxReal                gMouseDepth = 0.0f;
 	PxRigidDynamic*       gSelectedActor = NULL;
 
+	PxVisualDebuggerConnection* theConnection;
+
 	Box          mBox;
 	TerrainClass terrain;
+
+	ID3DX10Mesh* sphere;
+
 
 	void       buildFX();
 	void       buildVertexLayouts();
@@ -96,11 +114,14 @@ private:
 	void       StepPhysX();
 	D3DXMATRIX PxtoXMMatrix(PxTransform input);
 	void       DrawBox(PxShape* pShape, PxRigidActor* actor);
+	void	   DrawSphere(PxShape* pShape, PxRigidActor* actor);
 	void       DrawShape(PxShape* shape, PxRigidActor* actor);
 	void       DrawActor(PxRigidActor* actor);
-	void       RenderActors();
+	void       RenderActors(bool);
 	bool       CreateDevice(HWND);
 	void       FreeDevice();
+	
+
 
 
 

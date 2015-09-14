@@ -4,12 +4,12 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_PropertySheetDisplayName>dx10_debug</_PropertySheetDisplayName>
-    <IncludePath>$(DXSDK_DIR)Include;C:\nvapi-r343\R343-developer;$(IncludePath)</IncludePath>
+    <IncludePath>$(DXSDK_DIR)Include;$(DXSDK_DIR)Samples\C++\DXUT;C:\nvapi-r343\R343-developer;$(IncludePath)</IncludePath>
     <LibraryPath>$(DXSDK_DIR)Lib\x86;C:\nvapi-r343\R343-developer\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <Link>
-      <AdditionalDependencies>nvapi.lib;dxerr.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>nvapi.lib;dxerr.lib;DXUTOpt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup />

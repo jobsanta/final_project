@@ -10,6 +10,10 @@
     <Link>
       <AdditionalDependencies>kinect20.lib;Kinect20.Face.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup />
 </Project>

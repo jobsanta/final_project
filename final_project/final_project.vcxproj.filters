@@ -48,6 +48,9 @@
     <ClInclude Include="kinect_handle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="smooth_filter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -69,6 +72,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="kinect_handle.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="smooth_filter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

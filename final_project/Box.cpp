@@ -26,14 +26,14 @@ void Box::init(ID3D10Device* device, float scale)
 	// Create vertex buffer
     Vertex vertices[] =
     {
-		{D3DXVECTOR3(-1.0f, -1.0f, -1.0f), WHITE},
-		{D3DXVECTOR3(-1.0f, +1.0f, -1.0f), BLACK},
-		{D3DXVECTOR3(+1.0f, +1.0f, -1.0f), RED},
-		{D3DXVECTOR3(+1.0f, -1.0f, -1.0f), GREEN},
-		{D3DXVECTOR3(-1.0f, -1.0f, +1.0f), BLUE},
-		{D3DXVECTOR3(-1.0f, +1.0f, +1.0f), YELLOW},
-		{D3DXVECTOR3(+1.0f, +1.0f, +1.0f), CYAN},
-		{D3DXVECTOR3(+1.0f, -1.0f, +1.0f), MAGENTA},
+		{D3DXVECTOR3(-1.0f, -1.0f, -1.0f), BLUE},
+		{ D3DXVECTOR3(-1.0f, +1.0f, -1.0f), BLUE },
+		{ D3DXVECTOR3(+1.0f, +1.0f, -1.0f), BLUE },
+		{ D3DXVECTOR3(+1.0f, -1.0f, -1.0f), BLUE },
+		{ D3DXVECTOR3(-1.0f, -1.0f, +1.0f), BLUE },
+		{ D3DXVECTOR3(-1.0f, +1.0f, +1.0f), BLUE },
+		{ D3DXVECTOR3(+1.0f, +1.0f, +1.0f), BLUE },
+		{ D3DXVECTOR3(+1.0f, -1.0f, +1.0f), BLUE },
     };
 
 	// Scale the box.
