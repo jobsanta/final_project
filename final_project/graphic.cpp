@@ -1,5 +1,6 @@
 #include "graphic.h"
 
+
 Graphic::Graphic()
 {
 }
@@ -9,6 +10,22 @@ Graphic::~Graphic()
 	ShutdownPhysX();
 	FreeDevice();
 }
+
+//Defining a custome filter shader 
+PxFilterFlags customFilterShader(PxFilterObjectAttributes attributes0, PxFilterData filterData0,
+	PxFilterObjectAttributes attributes1, PxFilterData filterData1,
+	PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
+{
+	// all initial and persisting reports for everything, with per-point data
+	pairFlags = PxPairFlag::eCONTACT_DEFAULT
+		| PxPairFlag::eTRIGGER_DEFAULT
+		| PxPairFlag::eNOTIFY_CONTACT_POINTS
+		| PxPairFlag::eCCD_LINEAR; //Set flag to enable CCD (Continuous Collision Detection) 
+
+	return PxFilterFlag::eDEFAULT;
+}
+
+
 
 bool Graphic::Initialize(HWND g_hWnd)
 {
@@ -43,6 +60,7 @@ void Graphic::buildFX()
 
 	mTech_Box = mFX_Box->GetTechniqueByName("ColorTech");
 	mfxWVPVar_Box = mFX_Box->GetVariableByName("gWVP")->AsMatrix();
+	mfxCameraDistance_Box = mFX_Box->GetVariableByName("cameraDepth")->AsScalar();
 
 
 	hr = D3DX10CreateEffectFromFile(L"sphere.fx", 0, 0,
@@ -59,6 +77,7 @@ void Graphic::buildFX()
 
 	mTech_Sphere = mFX_Sphere->GetTechniqueByName("ColorTech");
 	mfxWVPVar_Sphere = mFX_Sphere->GetVariableByName("gWVP")->AsMatrix();
+	mfxCameraDistance_Sphere = mFX_Sphere->GetVariableByName("cameraDepth")->AsScalar();
 }
 
 void Graphic::buildVertexLayouts()
@@ -275,8 +294,11 @@ bool Graphic::CreateDevice(HWND g_hWnd)
 
 	float Near = 2.f;
 	float Far = 1000.0f;
+	//float fAspectRatio = (FLOAT)g_D3D10MainViewport.Width / (FLOAT)g_D3D10MainViewport.Height;
+	//D3DXMatrixPerspectiveFovLH(&mProj, D3DX_PI / 4, fAspectRatio, Near, Far);
+
 	float fAspectRatio = (FLOAT)g_D3D10MainViewport.Width / (FLOAT)g_D3D10MainViewport.Height;
-	D3DXMatrixPerspectiveFovLH(&mProj, D3DX_PI / 4, fAspectRatio, Near, Far);
+	D3DXMatrixPerspectiveFovLH(&mProj, D3DX_PI / 6, fAspectRatio, Near, Far);
 
 
 	
@@ -345,10 +367,16 @@ void Graphic::FreeDevice()
 void Graphic::Render(float x, float y, float z)
 {
 	D3DXVECTOR3 pos(x,y,z );
-	D3DXVECTOR3 target(0.0f, 3.0f, 0.0f);
+	D3DXVECTOR3 target(0.0f, y, 0.0f);
 	D3DXVECTOR3 up(0.0f, 1.0f, 0.0f);
 	D3DXMatrixLookAtLH(&mView, &pos, &target, &up);
 
+	float Near = 2.f;
+	float Far = 1000.0f;
+	float fAspectRatio = (FLOAT)g_D3D10MainViewport.Width / (FLOAT)g_D3D10MainViewport.Height;
+	float angle = 2*atan2(1.7, abs(z));
+	D3DXMatrixPerspectiveFovLH(&mProj, angle, fAspectRatio, Near, Far);
+	
 	static unsigned int frameNb = 0;
 
 	g_D3D10Device->RSSetViewports(1, &g_D3D10MainViewport);
@@ -362,11 +390,40 @@ void Graphic::Render(float x, float y, float z)
 	if (frameNb > 2)
 	{
 
-		if (gScene && frameNb > 40)
+		if (gScene && frameNb > 20)
 		{
 			StepPhysX();
 		}
+
+		if (boxesJoint.size() != 0)
+		{
+			for (int i = 0; i < boxesJoint.size(); i++)
+			{
+				PxVec3 offset(0, 0.01, 0);
+				if (boxesJoint[i] != NULL && particleJoint[i] != NULL)
+				{
+					PxDistanceJoint* joint = PxDistanceJointCreate(*gPhysicsSDK, boxesJoint[i], PxTransform(-offset), particleJoint[i], PxTransform(offset));
+					if (joint != NULL)
+					{
+						joint->setMaxDistance(0.5f);
+						joint->setDamping(0.5);
+						joint->setStiffness(2000.0f);
+						joint->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
+						joint->setDistanceJointFlag(PxDistanceJointFlag::eMAX_DISTANCE_ENABLED, true);
+					}
+				}
+			}
+			boxesJoint.clear();
+			particleJoint.clear();
+
+		}
+
+
 		float sep, conv;
+		if (NVAPI_OK != NvAPI_Stereo_SetConvergence(g_StereoHandle, abs(z)*10))
+		{
+			MessageBoxA(NULL, "Couldn't set the convergence", "NvAPI_Stereo_SetConvergence failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
+		}
 		if (NVAPI_OK != NvAPI_Stereo_GetSeparation(g_StereoHandle, &sep))
 		{
 			MessageBoxA(NULL, "Couldn't get the separation", "NvAPI_Stereo_GetSeparation failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
@@ -374,6 +431,7 @@ void Graphic::Render(float x, float y, float z)
 		if (NVAPI_OK != NvAPI_Stereo_GetConvergence(g_StereoHandle, &conv))
 		{
 			MessageBoxA(NULL, "Couldn't get the convergence", "NvAPI_Stereo_GetConvergence failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
+
 		}
 		if (sep * 0.01 != g_Separation || conv != g_Convergence)
 		{
@@ -392,6 +450,8 @@ void Graphic::Render(float x, float y, float z)
 		D3DXMatrixTranslation(&mat, -50.0, 0.0, -50.0);
 		mWVP = mat* mView*mProj;
 		mfxWVPVar_Box->SetMatrix((float*)&mWVP);
+		mfxCameraDistance_Box->SetFloat(z);
+		mfxCameraDistance_Sphere->SetFloat(z);
 		terrain.Render(g_D3D10Device);
 		mTech_Box->GetDesc(&techDesc);
 		for (UINT p = 0; p < techDesc.Passes; ++p)
@@ -456,13 +516,16 @@ void Graphic::InitializePhysX()
 	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);
 
 	if (!sceneDesc.cpuDispatcher) {
-		PxDefaultCpuDispatcher* mCpuDispatcher = PxDefaultCpuDispatcherCreate(1);
+		PxDefaultCpuDispatcher* mCpuDispatcher = PxDefaultCpuDispatcherCreate(3);
 		if (!mCpuDispatcher)
 			cerr << "PxDefaultCpuDispatcherCreate failed!" << endl;
 		sceneDesc.cpuDispatcher = mCpuDispatcher;
 	}
 	if (!sceneDesc.filterShader)
-		sceneDesc.filterShader = gDefaultFilterShader;
+		sceneDesc.filterShader = customFilterShader;//gDefaultFilterShader;
+	sceneDesc.simulationEventCallback = this;
+
+	sceneDesc.flags |= PxSceneFlag::eENABLE_CCD;
 
 
 	gScene = gPhysicsSDK->createScene(sceneDesc);
@@ -499,11 +562,7 @@ void Graphic::InitializePhysX()
 	if (!shape)
 		cerr << "create shape failed!" << endl;
 	gScene->addActor(*plane2);
-
-
-
-
-
+	
 	//2)           Create cube	 
 	PxReal         density = 1.0f;
 	PxTransform    transform(PxVec3(0.0f, 10.0f, 0.0f), PxQuat::createIdentity());
@@ -511,12 +570,13 @@ void Graphic::InitializePhysX()
 	PxBoxGeometry  geometry(dimensions);
 
 
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < 2; i++)
 	{
-		transform.p = PxVec3(0.0f, 5.0f + 5 * i, -5.0f);
+		transform.p = PxVec3(0.0f, 2.0f + 2 * i, -3.0f);
 		PxRigidDynamic *actor = PxCreateDynamic(*gPhysicsSDK, transform, geometry, *mMaterial, density);
 
 		actor->setAngularDamping(0.75);
+		actor->setMass(100.0);
 		actor->setLinearVelocity(PxVec3(0, 0, 0));
 		if (!actor)
 			cerr << "create actor failed!" << endl;
@@ -677,4 +737,51 @@ PxScene* Graphic::getScene()
 void Graphic::SetProxyActor(vector<PxRigidActor*> proxyParticleActor)
 {
 	proxyParticle = proxyParticleActor;
+}
+
+void Graphic::onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs)
+{
+	//cout << nbPairs << " Contact pair(s) detected\n";
+
+	const PxU32 buff = 64; //buffer size
+	PxContactPairPoint contacts[buff];
+
+	//loop through all contact pairs of PhysX simulation
+	for (PxU32 i = 0; i < nbPairs; i++)
+	{
+		//extract contant info from current contact-pair 
+		const PxContactPair& curContactPair = pairs[i];
+		PxU32 nbContacts = curContactPair.extractContacts(contacts, buff);
+		if (curContactPair.events & PxPairFlag::eNOTIFY_TOUCH_FOUND)
+		{
+			if (pairs->shapes[0]->getGeometryType() == PxGeometryType::eBOX && pairs->shapes[1]->getGeometryType() == PxGeometryType::eSPHERE)
+			{
+				PxRigidActor* box = pairHeader.actors[0];
+				PxRigidActor* sphere = pairHeader.actors[1];
+				if (std::find(boxesJoint.begin(), boxesJoint.end(), box) == boxesJoint.end())
+				{
+					boxesJoint.push_back(box);
+					particleJoint.push_back(sphere);
+				}
+			}
+			else if (pairs->shapes[1]->getGeometryType() == PxGeometryType::eBOX && pairs->shapes[0]->getGeometryType() == PxGeometryType::eSPHERE)
+			{
+				PxRigidActor* box = pairHeader.actors[1];
+				PxRigidActor* sphere = pairHeader.actors[0];
+				if (std::find(boxesJoint.begin(), boxesJoint.end(), box) == boxesJoint.end())
+				{
+					boxesJoint.push_back(box);
+					particleJoint.push_back(sphere);
+				}
+			}
+		}
+
+		//for (PxU32 j = 0; j < nbContacts; j++)
+		//{
+		//	//print all positions of contact.   
+		//	PxVec3 point = contacts[j].position;
+		//	
+		//	//cout << "Contact point (" << point.x << " " << point.y << " " << point.x << ")\n";
+		//}
+	}
 }

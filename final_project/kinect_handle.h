@@ -44,9 +44,9 @@ class KinectHandle
 	static const int        cDepthHeight = 424;
 	static const int        cColorWidth = 1920;
 	static const int        cColorHeight = 1080;
-	static const int		particle_flow_height = 180;
-	static const int		particle_flow_width = 320;
-	static const int		factor = 6;
+	static const int		particle_flow_height = 360;
+	static const int		particle_flow_width = 640;
+	static const int		factor = 3;
 
 
 
@@ -112,7 +112,7 @@ public:
 	void    ProcessFrame(INT64 nTime,
 			const UINT16* pDepthBuffer, int nDepthHeight, int nDepthWidth,
 			const RGBQUAD* pColorBuffer, int nColorWidth, int nColorHeight,
-			const BYTE* pBodyIndexBuffer, int nBodyIndexWidth, int nBodyIndexHeight, Mat& u, Mat& v);
+			const BYTE* pBodyIndexBuffer, int nBodyIndexWidth, int nBodyIndexHeight, IBody** ppBodies, int nBodyCount, Mat& u, Mat& v);
 
 	void	CloseKinect();
 	void	CloseOpenCV();

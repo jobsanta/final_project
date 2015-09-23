@@ -5,10 +5,13 @@ static const float c_FaceTextLayoutOffsetX = -0.1f;
 // face property text layout offset in Y axis
 static const float c_FaceTextLayoutOffsetY = -0.125f;
 
-static const float particleSize = 0.1f;
+static const float particleSize = 0.05f;
 
-static const float height = 0.80f;
-static const float degree = 31.0f;
+static const float height = 1.10;
+static const float degree = 60.0f;
+static const float interact_limit_y = 5.0f; // in 10 CM
+static const float interact_limit_y2 = .5f; // in 10 CM
+static const float interact_limit_Z = -5.0f;
 
 
 // define the face frame features required to be computed by this application
@@ -58,7 +61,7 @@ KinectHandle::KinectHandle()
 	}
 
 	face_x = 0.0f;
-	face_y = 4.5f;
+	face_y = 2.5f;
 	face_z = -8.0f;
 
 	referenceFrame = Mat::zeros(1080, 1920, CV_8UC1);
@@ -174,6 +177,7 @@ HRESULT KinectHandle::KinectProcess()
 	IDepthFrame*       pDepthFrame             = NULL;
 	IColorFrame*       pColorFrame             = NULL;
 	IBodyIndexFrame*   pBodyIndexFrame         = NULL;
+	IBodyFrame*		   pBodyFrame = NULL;
 
 	HRESULT hr = m_pMultiSourceFrameReader->AcquireLatestFrame(&pMultiSourceFrame);
 
@@ -219,6 +223,17 @@ HRESULT KinectHandle::KinectProcess()
 		SafeRelease(pBodyIndexFrameReference);
 	}
 
+	if (SUCCEEDED(hr))
+	{
+		IBodyFrameReference* pBodyFrameReference = NULL;
+		hr = pMultiSourceFrame->get_BodyFrameReference(&pBodyFrameReference);
+		if (SUCCEEDED(hr))
+		{
+			hr = pBodyFrameReference->AcquireFrame(&pBodyFrame);
+		}
+		SafeRelease(pBodyFrameReference);
+	}
+
 
 	// If all succeeded combine frame
 	if (SUCCEEDED(hr))
@@ -242,6 +257,9 @@ HRESULT KinectHandle::KinectProcess()
 		int                nBodyIndexHeight           = 0;
 		UINT               nBodyIndexBufferSize       = 0;
 		BYTE               *pBodyIndexBuffer          = NULL;
+
+		INT64				nBodyTime = 0;
+		IBody* ppBodies[BODY_COUNT] = { 0 };
 
 
 		pDepthFrame->get_RelativeTime(&nDepthTime);
@@ -308,10 +326,21 @@ HRESULT KinectHandle::KinectProcess()
 
 		if (SUCCEEDED(hr))
 		{
-			gotFace = ProcessFaces(pMultiSourceFrame);
+			hr = pBodyFrame->GetAndRefreshBodyData(_countof(ppBodies), ppBodies);
+		}
+
+
+		if (SUCCEEDED(hr))
+		{
+			gotFace = FALSE;// ProcessFaces(pMultiSourceFrame);
 			ProcessFrame(nDepthTime, pDepthBuffer, nDepthWidth, nDepthHeight,
 				pColorBuffer, nColorWidth, nColorHeight,
-				pBodyIndexBuffer, nBodyIndexWidth, nBodyIndexHeight, Last_u, Last_v);
+				pBodyIndexBuffer, nBodyIndexWidth, nBodyIndexHeight, ppBodies, BODY_COUNT, Last_u, Last_v);
+		}
+
+		for (int i = 0; i < _countof(ppBodies); ++i)
+		{
+			SafeRelease(ppBodies[i]);
 		}
 		SafeRelease(pDepthFrameDescription);
 		SafeRelease(pColorFrameDescription);
@@ -321,7 +350,9 @@ HRESULT KinectHandle::KinectProcess()
 	SafeRelease(pDepthFrame);
 	SafeRelease(pColorFrame);
 	SafeRelease(pBodyIndexFrame);
+	SafeRelease(pBodyFrame);
 	SafeRelease(pMultiSourceFrame);
+	
 
 	ParticleCompute();
 	return hr;
@@ -331,7 +362,7 @@ HRESULT KinectHandle::KinectProcess()
 void KinectHandle::ProcessFrame(INT64 nTime,
 	const UINT16* pDepthBuffer, int nDepthWidth, int nDepthHeight,
 	const RGBQUAD* pColorBuffer, int nColorWidth, int nColorHeight,
-	const BYTE* pBodyIndexBuffer, int nBodyIndexWidth, int nBodyIndexHeight, Mat&u, Mat&v)
+	const BYTE* pBodyIndexBuffer, int nBodyIndexWidth, int nBodyIndexHeight, IBody** ppBodies, int nBodyCount, Mat&u, Mat&v)
 {
 
 	if (m_pCoordinateMapper && m_pDepthCoordinates && m_pOutputRGBX &&
@@ -344,51 +375,76 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 		if (SUCCEEDED(hr))
 		{
 
-			if (gotFace)
+
+			for (int i = 0; i < nBodyCount; ++i)
 			{
-				PointF facePoints[FacePointType::FacePointType_Count];
-				pFaceFrameResult->GetFacePointsInColorSpace(FacePointType::FacePointType_Count, facePoints);
-				float average_y = (facePoints[FacePointType::FacePointType_EyeLeft].Y + facePoints[FacePointType::FacePointType_EyeRight].Y) / 2.0f;
-				float average_x = (facePoints[FacePointType::FacePointType_EyeLeft].X + facePoints[FacePointType::FacePointType_EyeRight].X) / 2.0f;
-				if (average_x > 0 && average_x < 1980 && average_y > 0 && average_y < 1080)
+				IBody* pBody = ppBodies[i];
+				if (pBody)
 				{
-					int index = average_y* nColorWidth + average_x;
-					
-					DepthSpacePoint p = m_pDepthCoordinates[index];
+					BOOLEAN bTracked = false;
+					hr = pBody->get_IsTracked(&bTracked);
 
-					//	 Values that are negative infinity means it is an invalid color to depth mapping so we
-					//	 skip processing for this pixel
-					if (p.X != -std::numeric_limits<float>::infinity() && p.Y != -std::numeric_limits<float>::infinity())
+					if (SUCCEEDED(hr) && bTracked)
 					{
-						int depthX = static_cast<int>(p.X + 0.5f);
-						int depthY = static_cast<int>(p.Y + 0.5f);
-
-						if ((depthX >= 0 && depthX < nDepthWidth) && (depthY >= 0 && depthY < nDepthHeight))
+						i = nBodyCount;
+						Joint joints[JointType_Count];
+						hr = pBody->GetJoints(_countof(joints), joints);
+						if (SUCCEEDED(hr))
 						{
-							//if the position is valid update the depth of the particle.
-							BYTE player = pBodyIndexBuffer[depthX + (depthY * cDepthWidth)];
-							UINT16 depth = pDepthBuffer[depthX + depthY*cDepthWidth];
+							CameraSpacePoint j = joints[JointType::JointType_Head].Position;
+							face_x = j.X;//-2.0f + 4.0f*x / (float)cColorWidth;
+							face_y = cos(degree * PI / 180.0f)*j.Y - sin(degree * PI / 180.0f)*j.Z + height;
+							face_z = sin(degree * PI / 180.0f)*j.Y + cos(degree * PI / 180.0f)*j.Z;
+							face_x *= 10.0f;
+							face_y *= 10.0f;
+							face_z *= -10.0f;
 
-							if (player != 0xff && depth > 500 && depth < 2000)
-							{
-								CameraSpacePoint camPoint;
-								m_pCoordinateMapper->MapDepthPointToCameraSpace(p, depth, &camPoint);
+							gotFace = TRUE;
 
-								face_x = camPoint.X;//-2.0f + 4.0f*x / (float)cColorWidth;
-								face_y = cos(degree * PI / 180.0f)*camPoint.Y - sin(degree * PI / 180.0f)*camPoint.Z + height;
-								face_z = sin(degree * PI / 180.0f)*camPoint.Y + cos(degree * PI / 180.0f)*camPoint.Z;
-
-								//	Particle newParticle = { x, y, depth };
-
-								face_x *= 10.0f;
-								face_y *= 10.0f;
-								face_z *= -10.0f;
-							}
 						}
 					}
 				}
-
 			}
+
+			//if (gotFace)
+			//{
+			//	PointF facePoints[FacePointType::FacePointType_Count];
+			//	pFaceFrameResult->GetFacePointsInColorSpace(FacePointType::FacePointType_Count, facePoints);
+			//	float average_y = (facePoints[FacePointType::FacePointType_EyeLeft].Y + facePoints[FacePointType::FacePointType_EyeRight].Y) / 2.0f;
+			//	float average_x = (facePoints[FacePointType::FacePointType_EyeLeft].X + facePoints[FacePointType::FacePointType_EyeRight].X) / 2.0f;
+			//	if (average_x > 0 && average_x < 1980 && average_y > 0 && average_y < 1080)
+			//	{
+			//		int index = average_y* nColorWidth + average_x;
+			//		
+			//		DepthSpacePoint p = m_pDepthCoordinates[index];
+			//		//	 Values that are negative infinity means it is an invalid color to depth mapping so we
+			//		//	 skip processing for this pixel
+			//		if (p.X != -std::numeric_limits<float>::infinity() && p.Y != -std::numeric_limits<float>::infinity())
+			//		{
+			//			int depthX = static_cast<int>(p.X + 0.5f);
+			//			int depthY = static_cast<int>(p.Y + 0.5f);
+			//			if ((depthX >= 0 && depthX < nDepthWidth) && (depthY >= 0 && depthY < nDepthHeight))
+			//			{
+			//				//if the position is valid update the depth of the particle.
+			//				BYTE player = pBodyIndexBuffer[depthX + (depthY * cDepthWidth)];
+			//				UINT16 depth = pDepthBuffer[depthX + depthY*cDepthWidth];
+			//				if (player != 0xff && depth > 500 && depth < 2000)
+			//				{
+			//					CameraSpacePoint camPoint;
+			//					m_pCoordinateMapper->MapDepthPointToCameraSpace(p, depth, &camPoint);
+			//					face_x = camPoint.X;//-2.0f + 4.0f*x / (float)cColorWidth;
+			//					face_y = cos(degree * PI / 180.0f)*camPoint.Y - sin(degree * PI / 180.0f)*camPoint.Z + height;
+			//					face_z = sin(degree * PI / 180.0f)*camPoint.Y + cos(degree * PI / 180.0f)*camPoint.Z;
+			//					//	Particle newParticle = { x, y, depth };
+			//					face_x *= 10.0f;
+			//					face_y *= 10.0f;
+			//					face_z *= -10.0f;
+			//				}
+			//			}
+			//		}
+			//	}
+
+			
 
 #pragma region update_particle
 			if (!u.empty() && !v.empty())
@@ -477,7 +533,7 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 										++it;
 										++itact;
 
-										circle(referenceFrame, Point(x, y), particleSize*10.0f, Scalar(255), -1);
+										//circle(referenceFrame, Point(x, y), particleSize*10.0f, Scalar(255), -1);
 
 									}
 									else
@@ -539,7 +595,8 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 							pSrc = m_pColorRGBX + colorIndex;
 							int x = colorIndex % cColorWidth;
 							int y = colorIndex / cColorWidth;
-							if (x % 5 == 0 && y % 5 == 0 && referenceFrame.at<UCHAR>(y, x) == 0)
+							//if (x % 5 == 0 && y % 5 == 0 && referenceFrame.at<UCHAR>(y, x) == 0)
+							if(x%5 ==0 && y%5 ==0)
 							{
 								//float depthM = (float)(depth - 500) / 50.0;
 
@@ -568,7 +625,7 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 								fd.flags |= PxQueryFlag::eANY_HIT;
 
 
-								if (!gScene->overlap(PxSphereGeometry(particleSize), shapePose, hit, fd) && y_r < face_y-1.0f && depthM > face_z)
+								if (!gScene->overlap(PxSphereGeometry(particleSize), shapePose, hit, fd) && y_r > interact_limit_y2 &&y_r < interact_limit_y && depthM > interact_limit_Z)
 								{
 									proxyParticle.push_back(newParticle);
 									PxRigidDynamic* newParticleActor = CreateSphere(PxVec3(x_r, y_r, depthM), particleSize, 1.0f);
@@ -589,17 +646,12 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 			
 			//std::vector<Particle> temporary;
 			//std::vector<PxRigidActor*> tempAct;
-
-
 			//for (int i = 0; i < proxyParticle.size(); i += 4)
 			//{
-
 			//	PxTransform trans = ((PxRigidDynamic*)(proxyParticleActor[i]))->getGlobalPose();
-
 			//	const PxU32 buffersize = 256;
 			//	PxOverlapHit overlapBuffer[buffersize];
 			//	PxOverlapBuffer buf(overlapBuffer, buffersize);
-
 			//	if (gScene->overlap(PxSphereGeometry(particleSize*3.0), trans, buf))
 			//	{
 			//		int hit = buf.nbTouches;
@@ -620,14 +672,9 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 			//				newParticleActor->setRigidDynamicFlag(PxRigidDynamicFlag::eKINEMATIC, true);
 			//				tempAct.push_back(newParticleActor);
 			//			}
-
 			//		}
 			//	}
-
-
 			//}
-
-
 			//proxyParticle.insert(proxyParticle.end(), temporary.begin(), temporary.end());
 			//proxyParticleActor.insert(proxyParticleActor.end(), tempAct.begin(), tempAct.end());
 
@@ -654,7 +701,7 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 
 
 
-				if (gScene->overlap(PxSphereGeometry(0.01f), shapePose, hit, fd) || trans.p.y >face_y-1.0 || trans.p.z < face_z)
+				if (gScene->overlap(PxSphereGeometry(0.01f), shapePose, hit, fd) || trans.p.y > interact_limit_y || trans.p.y < interact_limit_y2 || trans.p.z < interact_limit_Z)
 				{
 					it = proxyParticle.erase(it);
 					(*itact)->release();
@@ -953,9 +1000,9 @@ HRESULT KinectHandle::UpdateBodyData(IBody** ppBodies, IMultiSourceFrame* pMulti
 
 void KinectHandle::getFaceResult(float* x, float* y , float* z)
 {
-	*x = face_x;
-	*y = face_y;
-	*z = face_z;
+	*x = face_x ;
+	*y = face_y -0.5f;
+	*z = face_z +0.5f;
 }
 
 

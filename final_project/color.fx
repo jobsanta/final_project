@@ -7,6 +7,7 @@
 cbuffer cbPerObject
 {
 	float4x4 gWVP; 
+	float cameraDepth;
 };
 
 void VS(float3 iPosL  : POSITION,
@@ -15,7 +16,7 @@ void VS(float3 iPosL  : POSITION,
         out float4 oColor : COLOR)
 {
 	// Transform to homogeneous clip space.
-	oPosH = mul(float4(iPosL, 1.0f), gWVP);
+	oPosH = mul(float4(iPosL, 1.0f), gWVP)*abs(iPosL.z - cameraDepth );
 	
 	// Just pass vertex color into the pixel shader.
     oColor = iColor;

@@ -166,6 +166,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //  WM_DESTROY	- post a quit message and return
 //
 //
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;

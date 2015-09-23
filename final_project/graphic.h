@@ -37,11 +37,11 @@ using namespace physx;
 using namespace std;
 
 
-class Graphic
+class Graphic : public PxSimulationEventCallback
 {
 public:
 
-	float BoxSize = 1.0f;
+	float BoxSize = 0.5f;
 
 	Graphic();
 	~Graphic();
@@ -50,6 +50,12 @@ public:
 	PxScene* getScene();
 	void SetProxyActor(vector<PxRigidActor*>);
 	PxPhysics* getPhysicsSDK();
+
+	virtual void							onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs);
+	virtual void							onTrigger(PxTriggerPair* pairs, PxU32 count){};
+	virtual void							onConstraintBreak(PxConstraintInfo*, PxU32) {}
+	virtual void							onWake(PxActor**, PxU32) {}
+	virtual void							onSleep(PxActor**, PxU32){}
 
 private:
 
@@ -72,17 +78,18 @@ private:
 	ID3D10Effect*               mFX_Box;
 	ID3D10EffectTechnique*      mTech_Box;
 	ID3D10EffectMatrixVariable* mfxWVPVar_Box;
+	ID3D10EffectScalarVariable* mfxCameraDistance_Box;
 
 	ID3D10Effect*               mFX_Sphere;
 	ID3D10EffectTechnique*      mTech_Sphere;
 	ID3D10EffectMatrixVariable* mfxWVPVar_Sphere;
+	ID3D10EffectScalarVariable* mfxCameraDistance_Sphere;
 
 	ID3D10InputLayout*          mVertexLayout;
 
 	D3DXMATRIX mView;
 	D3DXMATRIX mProj;
 	D3DXMATRIX mWVP;
-
 
 	PxPhysics*                gPhysicsSDK = NULL;
 	PxDefaultErrorCallback    gDefaultErrorCallback;
@@ -91,9 +98,11 @@ private:
 	PxFoundation*             gFoundation = NULL;
 
 	PxScene*              gScene = NULL;
-	PxReal                myTimestep = 1.0f / 10.0f;
+	PxReal                myTimestep = 1.0f / 60.0f;
 	vector<PxRigidActor*> boxes;
 	vector<PxRigidActor*> proxyParticle;
+	vector<PxRigidActor*> boxesJoint;
+	vector<PxRigidActor*> particleJoint;
 	PxDistanceJoint*      gMouseJoint = NULL;
 	PxRigidDynamic*       gMouseSphere = NULL;
 	PxReal                gMouseDepth = 0.0f;

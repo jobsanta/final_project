@@ -1,23 +1,66 @@
-﻿Build started 9/10/2015 09:48:37.
+﻿Build started 9/22/2015 20:29:00.
      1>Project "C:\Users\sthanyadit\documents\visual studio 2013\Projects\final_project\final_project\final_project.vcxproj" on node 2 (Build target(s)).
      1>ClCompile:
-         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /Ic:\opencv\install\x86\vc12\..\..\include /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _WINDOWS /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt kinect_handle.cpp
-         kinect_handle.cpp
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(311): warning C4800: 'BOOLEAN' : forcing value to bool 'true' or 'false' (performance warning)
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(355): warning C4244: 'initializing' : conversion from 'float' to 'int', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(378): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(379): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(407): warning C4244: 'initializing' : conversion from 'float' to 'int', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(408): warning C4244: 'initializing' : conversion from 'float' to 'int', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(420): warning C4244: 'initializing' : conversion from 'float' to 'int', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(421): warning C4244: 'initializing' : conversion from 'float' to 'int', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(458): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(459): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(480): warning C4244: 'argument' : conversion from 'const float' to 'int', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(554): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(555): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(557): warning C4244: 'initializing' : conversion from 'int' to 'float', possible loss of data
-     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\kinect_handle.cpp(691): warning C4305: 'argument' : truncation from 'double' to 'float'
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /Ic:\opencv\install\x86\vc12\..\..\include /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _WINDOWS /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt graphic.cpp
+         graphic.cpp
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(12): warning C4005: 'DXGI_STATUS_OCCLUDED' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50092) : see previous definition of 'DXGI_STATUS_OCCLUDED'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(13): warning C4005: 'DXGI_STATUS_CLIPPED' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50101) : see previous definition of 'DXGI_STATUS_CLIPPED'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(14): warning C4005: 'DXGI_STATUS_NO_REDIRECTION' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50110) : see previous definition of 'DXGI_STATUS_NO_REDIRECTION'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(15): warning C4005: 'DXGI_STATUS_NO_DESKTOP_ACCESS' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50119) : see previous definition of 'DXGI_STATUS_NO_DESKTOP_ACCESS'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(16): warning C4005: 'DXGI_STATUS_GRAPHICS_VIDPN_SOURCE_IN_USE' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50128) : see previous definition of 'DXGI_STATUS_GRAPHICS_VIDPN_SOURCE_IN_USE'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(17): warning C4005: 'DXGI_STATUS_MODE_CHANGED' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50137) : see previous definition of 'DXGI_STATUS_MODE_CHANGED'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(18): warning C4005: 'DXGI_STATUS_MODE_CHANGE_IN_PROGRESS' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50146) : see previous definition of 'DXGI_STATUS_MODE_CHANGE_IN_PROGRESS'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(21): warning C4005: 'DXGI_ERROR_INVALID_CALL' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50161) : see previous definition of 'DXGI_ERROR_INVALID_CALL'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(22): warning C4005: 'DXGI_ERROR_NOT_FOUND' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50170) : see previous definition of 'DXGI_ERROR_NOT_FOUND'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(23): warning C4005: 'DXGI_ERROR_MORE_DATA' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50179) : see previous definition of 'DXGI_ERROR_MORE_DATA'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(24): warning C4005: 'DXGI_ERROR_UNSUPPORTED' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50188) : see previous definition of 'DXGI_ERROR_UNSUPPORTED'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(25): warning C4005: 'DXGI_ERROR_DEVICE_REMOVED' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50197) : see previous definition of 'DXGI_ERROR_DEVICE_REMOVED'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(26): warning C4005: 'DXGI_ERROR_DEVICE_HUNG' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50206) : see previous definition of 'DXGI_ERROR_DEVICE_HUNG'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(27): warning C4005: 'DXGI_ERROR_DEVICE_RESET' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50216) : see previous definition of 'DXGI_ERROR_DEVICE_RESET'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(28): warning C4005: 'DXGI_ERROR_WAS_STILL_DRAWING' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50225) : see previous definition of 'DXGI_ERROR_WAS_STILL_DRAWING'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(29): warning C4005: 'DXGI_ERROR_FRAME_STATISTICS_DISJOINT' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50235) : see previous definition of 'DXGI_ERROR_FRAME_STATISTICS_DISJOINT'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(30): warning C4005: 'DXGI_ERROR_GRAPHICS_VIDPN_SOURCE_IN_USE' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50244) : see previous definition of 'DXGI_ERROR_GRAPHICS_VIDPN_SOURCE_IN_USE'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(31): warning C4005: 'DXGI_ERROR_DRIVER_INTERNAL_ERROR' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50254) : see previous definition of 'DXGI_ERROR_DRIVER_INTERNAL_ERROR'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(32): warning C4005: 'DXGI_ERROR_NONEXCLUSIVE' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50263) : see previous definition of 'DXGI_ERROR_NONEXCLUSIVE'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(33): warning C4005: 'DXGI_ERROR_NOT_CURRENTLY_AVAILABLE' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50272) : see previous definition of 'DXGI_ERROR_NOT_CURRENTLY_AVAILABLE'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(34): warning C4005: 'DXGI_ERROR_REMOTE_CLIENT_DISCONNECTED' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50282) : see previous definition of 'DXGI_ERROR_REMOTE_CLIENT_DISCONNECTED'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(35): warning C4005: 'DXGI_ERROR_REMOTE_OUTOFMEMORY' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50291) : see previous definition of 'DXGI_ERROR_REMOTE_OUTOFMEMORY'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\d3d10.h(608): warning C4005: 'D3D10_ERROR_TOO_MANY_UNIQUE_STATE_OBJECTS' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50445) : see previous definition of 'D3D10_ERROR_TOO_MANY_UNIQUE_STATE_OBJECTS'
+     1>c:\program files (x86)\microsoft directx sdk (june 2010)\include\d3d10.h(609): warning C4005: 'D3D10_ERROR_FILE_NOT_FOUND' : macro redefinition
+                 c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50454) : see previous definition of 'D3D10_ERROR_FILE_NOT_FOUND'
+     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\graphic.cpp(301): warning C4305: 'argument' : truncation from 'double' to 'FLOAT'
+     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\graphic.cpp(377): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
+     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\graphic.cpp(400): warning C4018: '<' : signed/unsigned mismatch
+     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\graphic.cpp(402): warning C4305: 'argument' : truncation from 'double' to 'physx::PxReal'
+     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\graphic.cpp(438): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
+     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\graphic.cpp(598): warning C4018: '<' : signed/unsigned mismatch
+     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\graphic.cpp(603): warning C4018: '<' : signed/unsigned mismatch
+     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\graphic.cpp(719): warning C4018: '<' : signed/unsigned mismatch
+     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\graphic.cpp(723): warning C4018: '<' : signed/unsigned mismatch
+     1>c:\users\sthanyadit\documents\visual studio 2013\projects\final_project\final_project\graphic.cpp(37): warning C4715: 'Graphic::Initialize' : not all control paths return a value
        Link:
          C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\Users\sthanyadit\documents\visual studio 2013\Projects\final_project\Debug\final_project.exe" /INCREMENTAL /NOLOGO /LIBPATH:c:\opencv\install\x86\vc12\lib nvapi.lib dxerr.lib DXUTOpt.lib PhysX3DEBUG_x86.lib PhysX3CommonDEBUG_x86.lib PhysX3ExtensionsDEBUG.lib PhysXVisualDebuggerSDKDEBUG.lib opencv_core2410d.lib opencv_imgproc2410d.lib opencv_highgui2410d.lib opencv_ml2410d.lib opencv_video2410d.lib opencv_features2d2410d.lib opencv_calib3d2410d.lib opencv_objdetect2410d.lib opencv_contrib2410d.lib opencv_legacy2410d.lib opencv_flann2410d.lib opencv_gpu2410d.lib kinect20.lib Kinect20.Face.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:\Users\sthanyadit\documents\visual studio 2013\Projects\final_project\Debug\final_project.pdb" /SUBSYSTEM:WINDOWS /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\Users\sthanyadit\documents\visual studio 2013\Projects\final_project\Debug\final_project.lib" /MACHINE:X86 Debug\final_project.res
          Debug\Box.obj
@@ -33,4 +76,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:01.62
+Time Elapsed 00:00:01.32
