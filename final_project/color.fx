@@ -10,6 +10,7 @@ cbuffer cbPerObject
 	float cameraDepth;
 };
 
+
 void VS(float3 iPosL  : POSITION,
         float4 iColor : COLOR,
         out float4 oPosH  : SV_POSITION,

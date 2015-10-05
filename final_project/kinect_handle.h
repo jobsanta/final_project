@@ -37,6 +37,14 @@ struct Particle
 	float Depth;
 };
 
+struct FilterGroup
+{
+	enum Enum
+	{
+		ePARTICLE = (1 << 0),
+	};
+};
+
 
 class KinectHandle
 {
@@ -67,6 +75,7 @@ public:
 	PxScene*   gScene = NULL;
 
 	vector<PxRigidActor*> proxyParticleActor;
+	vector<PxRigidActor*> proxyParticleJoint;
 	std::vector<Particle> proxyParticle;
 	bool gotFace;
 
@@ -139,6 +148,8 @@ private:
 	float								face_x;
 	float								face_y;
 	float								face_z;
+
+	void setupFiltering(PxRigidActor* actor, PxU32 filterGroup, PxU32 filterMask);
 
 
 };

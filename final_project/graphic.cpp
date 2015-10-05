@@ -1,8 +1,10 @@
 #include "graphic.h"
 
+const float BoxSize = 0.75f;
 
 Graphic::Graphic()
 {
+	m_Texture = 0;
 }
 
 Graphic::~Graphic()
@@ -22,10 +24,14 @@ PxFilterFlags customFilterShader(PxFilterObjectAttributes attributes0, PxFilterD
 		| PxPairFlag::eNOTIFY_CONTACT_POINTS
 		| PxPairFlag::eCCD_LINEAR; //Set flag to enable CCD (Continuous Collision Detection) 
 
+	//return PxFilterFlag::eDEFAULT;		
+	if ((filterData0.word0 & filterData1.word1) && (filterData1.word0 & filterData0.word1))
+		return PxFilterFlag::eKILL;
+
 	return PxFilterFlag::eDEFAULT;
+
+
 }
-
-
 
 bool Graphic::Initialize(HWND g_hWnd)
 {
@@ -86,7 +92,7 @@ void Graphic::buildVertexLayouts()
 	D3D10_INPUT_ELEMENT_DESC vertexDesc[] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D10_INPUT_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D10_INPUT_PER_VERTEX_DATA, 0 }
+		{ "TEXCORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D10_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
 	// Create the input layout
@@ -94,6 +100,13 @@ void Graphic::buildVertexLayouts()
 	mTech_Box->GetPassByIndex(0)->GetDesc(&PassDesc);
 	HR(g_D3D10Device->CreateInputLayout(vertexDesc, 2, PassDesc.pIAInputSignature,
 		PassDesc.IAInputSignatureSize, &mVertexLayout));
+
+
+	D3D10_INPUT_ELEMENT_DESC vertexDesc[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D10_INPUT_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D10_INPUT_PER_VERTEX_DATA, 0 }
+	};
 
 	mTech_Sphere->GetPassByIndex(0)->GetDesc(&PassDesc);
 	HR(g_D3D10Device->CreateInputLayout(vertexDesc, 2, PassDesc.pIAInputSignature,
@@ -307,14 +320,21 @@ bool Graphic::CreateDevice(HWND g_hWnd)
 	mBox.init(g_D3D10Device, BoxSize);
 	terrain.Initialize(g_D3D10Device);
 
-	DXUTCreateSphere(g_D3D10Device, 0.05f, 20, 20, &sphere);
-
+	DXUTCreateSphere(g_D3D10Device, 0.05f, 20, 20, &sphere); 
+	const D3D10_INPUT_ELEMENT_DESC* vDesc;
+	UINT cnt = 0;
+	sphere->GetVertexDescription(&vDesc, &cnt);
 	sphere->CommitToDevice();
 
 
 	// Simple FX and layout
 	buildFX();
 	buildVertexLayouts();
+	bool result;
+	m_Texture = new TextureClass();
+	result = m_Texture->Initialize(g_D3D10Device,L"/seafloor.dds");
+	if (!result)
+		return false;
 
 	return true;
 }
@@ -359,6 +379,14 @@ void Graphic::FreeDevice()
 		g_D3D10Device->Release();
 		g_D3D10Device = 0;
 	}
+	if (m_Texture)
+	{
+		m_Texture->Shutdown();
+		delete m_Texture;
+		m_Texture = 0;
+
+	}
+
 	ReleaseCOM(mFX_Sphere);
 	ReleaseCOM(mFX_Box);
 	ReleaseCOM(mVertexLayout);
@@ -395,32 +423,32 @@ void Graphic::Render(float x, float y, float z)
 			StepPhysX();
 		}
 
-		if (boxesJoint.size() != 0)
-		{
-			for (int i = 0; i < boxesJoint.size(); i++)
-			{
-				PxVec3 offset(0, 0.01, 0);
-				if (boxesJoint[i] != NULL && particleJoint[i] != NULL)
-				{
-					PxDistanceJoint* joint = PxDistanceJointCreate(*gPhysicsSDK, boxesJoint[i], PxTransform(-offset), particleJoint[i], PxTransform(offset));
-					if (joint != NULL)
-					{
-						joint->setMaxDistance(0.5f);
-						joint->setDamping(0.5);
-						joint->setStiffness(2000.0f);
-						joint->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
-						joint->setDistanceJointFlag(PxDistanceJointFlag::eMAX_DISTANCE_ENABLED, true);
-					}
-				}
-			}
-			boxesJoint.clear();
-			particleJoint.clear();
+		//if (boxesJoint.size() != 0)
+		//{
+		//	for (int i = 0; i < boxesJoint.size(); i++)
+		//	{
+		//		PxVec3 offset(0, 0.01, 0);
+		//		if (boxesJoint[i] != NULL && particleJoint[i] != NULL)
+		//		{
+		//			PxDistanceJoint* joint = PxDistanceJointCreate(*gPhysicsSDK, boxesJoint[i], PxTransform(-offset), particleJoint[i], PxTransform(offset));
+		//			if (joint != NULL)
+		//			{
+		//				joint->setMaxDistance(0.5f);
+		//				joint->setDamping(0.5);
+		//				joint->setStiffness(2000.0f);
+		//				joint->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
+		//				joint->setDistanceJointFlag(PxDistanceJointFlag::eMAX_DISTANCE_ENABLED, true);
+		//			}
+		//		}
+		//	}
+		//	boxesJoint.clear();
+		//	particleJoint.clear();
 
-		}
+		//}
 
 
 		float sep, conv;
-		if (NVAPI_OK != NvAPI_Stereo_SetConvergence(g_StereoHandle, abs(z)*10))
+		if (NVAPI_OK != NvAPI_Stereo_SetConvergence(g_StereoHandle, abs(z)*15))
 		{
 			MessageBoxA(NULL, "Couldn't set the convergence", "NvAPI_Stereo_SetConvergence failed", MB_OK | MB_SETFOREGROUND | MB_TOPMOST);
 		}
@@ -524,7 +552,6 @@ void Graphic::InitializePhysX()
 	if (!sceneDesc.filterShader)
 		sceneDesc.filterShader = customFilterShader;//gDefaultFilterShader;
 	sceneDesc.simulationEventCallback = this;
-
 	sceneDesc.flags |= PxSceneFlag::eENABLE_CCD;
 
 
@@ -536,7 +563,7 @@ void Graphic::InitializePhysX()
 	gScene->setVisualizationParameter(PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
 
 
-	PxMaterial* mMaterial = gPhysicsSDK->createMaterial(0.5, 0.5, 0.5);
+	PxMaterial* mMaterial = gPhysicsSDK->createMaterial(100, 100, 0.5);
 
 	//Create actors 
 	//1) Create ground plane
@@ -572,11 +599,11 @@ void Graphic::InitializePhysX()
 
 	for (int i = 0; i < 2; i++)
 	{
-		transform.p = PxVec3(0.0f, 2.0f + 2 * i, -3.0f);
+		transform.p = PxVec3(-1.0f+2.0f * i, 1.0f, -3.0f);
 		PxRigidDynamic *actor = PxCreateDynamic(*gPhysicsSDK, transform, geometry, *mMaterial, density);
 
 		actor->setAngularDamping(0.75);
-		actor->setMass(100.0);
+		actor->setMass(1.0);
 		actor->setLinearVelocity(PxVec3(0, 0, 0));
 		if (!actor)
 			cerr << "create actor failed!" << endl;
@@ -669,9 +696,8 @@ void Graphic::DrawBox(PxShape* pShape, PxRigidActor* actor)
 
 void Graphic::DrawSphere(PxShape* pShape, PxRigidActor* actor)
 {
-	PxTransform pT = PxShapeExt::getGlobalPose(*pShape, *actor);
-	PxBoxGeometry bg;
-	pShape->getBoxGeometry(bg);
+	
+	PxTransform pT =  actor->getGlobalPose();
 	D3DXMATRIX mat = PxtoXMMatrix(pT);
 
 	mWVP = mat* mView*mProj;
@@ -696,6 +722,9 @@ void Graphic::DrawShape(PxShape* shape, PxRigidActor* actor)
 		DrawBox(shape, actor);
 		break;
 	case PxGeometryType::eSPHERE:
+		DrawSphere(shape, actor);
+		break;
+	case PxGeometryType::eINVALID:
 		DrawSphere(shape, actor);
 		break;
 	}
@@ -743,45 +772,45 @@ void Graphic::onContact(const PxContactPairHeader& pairHeader, const PxContactPa
 {
 	//cout << nbPairs << " Contact pair(s) detected\n";
 
-	const PxU32 buff = 64; //buffer size
-	PxContactPairPoint contacts[buff];
+	//const PxU32 buff = 64; //buffer size
+	//PxContactPairPoint contacts[buff];
 
-	//loop through all contact pairs of PhysX simulation
-	for (PxU32 i = 0; i < nbPairs; i++)
-	{
-		//extract contant info from current contact-pair 
-		const PxContactPair& curContactPair = pairs[i];
-		PxU32 nbContacts = curContactPair.extractContacts(contacts, buff);
-		if (curContactPair.events & PxPairFlag::eNOTIFY_TOUCH_FOUND)
-		{
-			if (pairs->shapes[0]->getGeometryType() == PxGeometryType::eBOX && pairs->shapes[1]->getGeometryType() == PxGeometryType::eSPHERE)
-			{
-				PxRigidActor* box = pairHeader.actors[0];
-				PxRigidActor* sphere = pairHeader.actors[1];
-				if (std::find(boxesJoint.begin(), boxesJoint.end(), box) == boxesJoint.end())
-				{
-					boxesJoint.push_back(box);
-					particleJoint.push_back(sphere);
-				}
-			}
-			else if (pairs->shapes[1]->getGeometryType() == PxGeometryType::eBOX && pairs->shapes[0]->getGeometryType() == PxGeometryType::eSPHERE)
-			{
-				PxRigidActor* box = pairHeader.actors[1];
-				PxRigidActor* sphere = pairHeader.actors[0];
-				if (std::find(boxesJoint.begin(), boxesJoint.end(), box) == boxesJoint.end())
-				{
-					boxesJoint.push_back(box);
-					particleJoint.push_back(sphere);
-				}
-			}
-		}
+	////loop through all contact pairs of PhysX simulation
+	//for (PxU32 i = 0; i < nbPairs; i++)
+	//{
+	//	//extract contant info from current contact-pair 
+	//	const PxContactPair& curContactPair = pairs[i];
+	//	PxU32 nbContacts = curContactPair.extractContacts(contacts, buff);
+	//	if (curContactPair.events & PxPairFlag::eNOTIFY_TOUCH_FOUND)
+	//	{
+	//		if (pairs->shapes[0]->getGeometryType() == PxGeometryType::eBOX && pairs->shapes[1]->getGeometryType() == PxGeometryType::eSPHERE)
+	//		{
+	//			PxRigidActor* box = pairHeader.actors[0];
+	//			PxRigidActor* sphere = pairHeader.actors[1];
+	//			if (std::find(boxesJoint.begin(), boxesJoint.end(), box) == boxesJoint.end())
+	//			{
+	//				boxesJoint.push_back(box);
+	//				particleJoint.push_back(sphere);
+	//			}
+	//		}
+	//		else if (pairs->shapes[1]->getGeometryType() == PxGeometryType::eBOX && pairs->shapes[0]->getGeometryType() == PxGeometryType::eSPHERE)
+	//		{
+	//			PxRigidActor* box = pairHeader.actors[1];
+	//			PxRigidActor* sphere = pairHeader.actors[0];
+	//			if (std::find(boxesJoint.begin(), boxesJoint.end(), box) == boxesJoint.end())
+	//			{
+	//				boxesJoint.push_back(box);
+	//				particleJoint.push_back(sphere);
+	//			}
+	//		}
+	//	}
 
-		//for (PxU32 j = 0; j < nbContacts; j++)
-		//{
-		//	//print all positions of contact.   
-		//	PxVec3 point = contacts[j].position;
-		//	
-		//	//cout << "Contact point (" << point.x << " " << point.y << " " << point.x << ")\n";
-		//}
-	}
+	//	//for (PxU32 j = 0; j < nbContacts; j++)
+	//	//{
+	//	//	//print all positions of contact.   
+	//	//	PxVec3 point = contacts[j].position;
+	//	//	
+	//	//	//cout << "Contact point (" << point.x << " " << point.y << " " << point.x << ")\n";
+	//	//}
+	//}
 }

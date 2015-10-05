@@ -29,6 +29,7 @@
 #include "nvapi.h"
 #pragma comment(lib, "nvapi.lib")
 #include "terrainclass.h"
+#include "textureclass.h"
 
 #include <tchar.h>
 #include "nvStereo.h"
@@ -41,7 +42,7 @@ class Graphic : public PxSimulationEventCallback
 {
 public:
 
-	float BoxSize = 0.5f;
+	
 
 	Graphic();
 	~Graphic();
@@ -98,7 +99,7 @@ private:
 	PxFoundation*             gFoundation = NULL;
 
 	PxScene*              gScene = NULL;
-	PxReal                myTimestep = 1.0f / 60.0f;
+	PxReal                myTimestep = 1.0f / 20.0f;
 	vector<PxRigidActor*> boxes;
 	vector<PxRigidActor*> proxyParticle;
 	vector<PxRigidActor*> boxesJoint;
@@ -112,6 +113,7 @@ private:
 
 	Box          mBox;
 	TerrainClass terrain;
+	TextureClass* m_Texture;
 
 	ID3DX10Mesh* sphere;
 

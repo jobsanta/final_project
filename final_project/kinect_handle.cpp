@@ -5,12 +5,12 @@ static const float c_FaceTextLayoutOffsetX = -0.1f;
 // face property text layout offset in Y axis
 static const float c_FaceTextLayoutOffsetY = -0.125f;
 
-static const float particleSize = 0.05f;
+static const float particleSize = 0.2f;
 
 static const float height = 1.10;
 static const float degree = 60.0f;
 static const float interact_limit_y = 5.0f; // in 10 CM
-static const float interact_limit_y2 = .5f; // in 10 CM
+static const float interact_limit_y2 = 0.1f; // in 10 CM
 static const float interact_limit_Z = -5.0f;
 
 
@@ -165,6 +165,20 @@ HRESULT KinectHandle::CreateFirstConnected()
 
 }
 
+void KinectHandle::setupFiltering(PxRigidActor* actor, PxU32 filterGroup, PxU32 filterMask)
+{
+	PxFilterData filterData;
+	filterData.word0 = filterGroup; // word0 = own ID
+	filterData.word1 = filterMask;  // word1 = ID mask to filter pairs that trigger a contact callback;
+	const PxU32 numShapes = actor->getNbShapes();
+	PxShape* shapes[2];
+	actor->getShapes(shapes, 2);
+	for (PxU32 i = 0; i < numShapes; i++)
+	{
+		PxShape* shape = shapes[i];
+		shape->setSimulationFilterData(filterData);
+	}
+}
 
 HRESULT KinectHandle::KinectProcess()
 {
@@ -451,6 +465,7 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 			{
 				vector<Particle>::iterator it = proxyParticle.begin();
 				vector<PxRigidActor*>::iterator itact = proxyParticleActor.begin();
+				vector<PxRigidActor*>::iterator itjoint = proxyParticleJoint.begin();
 
 				//for (int i = 0; i < boxes.size(); i++)
 				//{
@@ -471,8 +486,8 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 						const float* ptr_v = v.ptr<float>(y_small);
 						float dx = ptr_u[x_small];
 						float dy = ptr_v[x_small];
-						(*it).x += factor * dx;
-						(*it).y += factor * dy;
+						(*it).x += 2*factor * dx;
+						(*it).y += 2*factor * dy;
 						int x = (*it).x;
 						int y = (*it).y;
 						double depth = (*it).Depth;
@@ -486,6 +501,10 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 							it = proxyParticle.erase(it);
 							(*itact)->release();
 							itact = proxyParticleActor.erase(itact);
+							(*itjoint)->release();
+							itjoint = proxyParticleJoint.erase(itjoint);
+
+
 						}
 						else
 						{
@@ -532,6 +551,7 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 
 										++it;
 										++itact;
+										++itjoint;
 
 										//circle(referenceFrame, Point(x, y), particleSize*10.0f, Scalar(255), -1);
 
@@ -541,6 +561,8 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 										it = proxyParticle.erase(it);
 										(*itact)->release();
 										itact = proxyParticleActor.erase(itact);
+										(*itjoint)->release();
+										itjoint = proxyParticleJoint.erase(itjoint);
 									}
 
 								}
@@ -549,6 +571,8 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 									it = proxyParticle.erase(it);
 									(*itact)->release();
 									itact = proxyParticleActor.erase(itact);
+									(*itjoint)->release();
+									itjoint = proxyParticleJoint.erase(itjoint);
 								}
 
 							}
@@ -557,6 +581,8 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 								it = proxyParticle.erase(it);
 								(*itact)->release();
 								itact = proxyParticleActor.erase(itact);
+								(*itjoint)->release();
+								itjoint = proxyParticleJoint.erase(itjoint);
 							}
 						}
 					}
@@ -630,7 +656,29 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 									proxyParticle.push_back(newParticle);
 									PxRigidDynamic* newParticleActor = CreateSphere(PxVec3(x_r, y_r, depthM), particleSize, 1.0f);
 									newParticleActor->setRigidDynamicFlag(PxRigidDynamicFlag::eKINEMATIC, true);
+
+									PxU32 nShapes = newParticleActor->getNbShapes();
+									PxShape** shapes = new PxShape*[nShapes];
+									newParticleActor->getShapes(shapes, nShapes);
+
+									while (nShapes--)
+									{
+										shapes[nShapes]->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
+									}
+
+									PxRigidDynamic* newParticleActorJoint = CreateSphere(PxVec3(x_r, y_r, depthM), particleSize, 1.0f);
+									newParticleActorJoint->setActorFlag(PxActorFlag::eDISABLE_GRAVITY,true);
+
+									setupFiltering(newParticleActorJoint, FilterGroup::ePARTICLE, FilterGroup::ePARTICLE);
+
+									PxDistanceJoint* joint = PxDistanceJointCreate(*gPhysicsSDK, newParticleActor, PxTransform(PxVec3(0.0, 0.0, 0.0)), newParticleActorJoint, PxTransform(PxVec3(0.0, 0.0, 0.0)));
+									joint->setDamping(100.0);
+									joint->setStiffness(10000.0f);
+									joint->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
 									proxyParticleActor.push_back(newParticleActor);
+									proxyParticleJoint.push_back(newParticleActorJoint);
+
+
 								}
 
 							}
@@ -682,14 +730,21 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 			//Clear Overlap particle
 			vector<Particle>::iterator it = proxyParticle.begin();
 			vector<PxRigidActor*>::iterator itact = proxyParticleActor.begin();
+			vector<PxRigidActor*>::iterator itjoint = proxyParticleJoint.begin();
+
 
 
 			for (; it != proxyParticle.end();)
 			{
 				PxShape* buffer[2];
+				PxShape* bufferAct[2];
 				((PxRigidDynamic*)(*itact))->getShapes(buffer, 2);
 
 				buffer[0]->setFlag(PxShapeFlag::eSCENE_QUERY_SHAPE, false);
+
+				((PxRigidDynamic*)(*itjoint))->getShapes(bufferAct, 2);
+
+				bufferAct[0]->setFlag(PxShapeFlag::eSCENE_QUERY_SHAPE, false);
 
 				PxTransform trans = ((PxRigidDynamic*)(*itact))->getGlobalPose();
 
@@ -699,19 +754,23 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 				PxQueryFilterData fd;
 				fd.flags |= PxQueryFlag::eANY_HIT;
 
+				//gScene->overlap(PxSphereGeometry(0.01f), shapePose, hit, fd) ||
 
-
-				if (gScene->overlap(PxSphereGeometry(0.01f), shapePose, hit, fd) || trans.p.y > interact_limit_y || trans.p.y < interact_limit_y2 || trans.p.z < interact_limit_Z)
+				if ( trans.p.y > interact_limit_y || trans.p.y < interact_limit_y2 || trans.p.z < interact_limit_Z)
 				{
 					it = proxyParticle.erase(it);
 					(*itact)->release();
 					itact = proxyParticleActor.erase(itact);
+					(*itjoint)->release();
+					itjoint = proxyParticleJoint.erase(itjoint);
 				}
 				else
 				{
 					buffer[0]->setFlag(PxShapeFlag::eSCENE_QUERY_SHAPE, true);
+					bufferAct[0]->setFlag(PxShapeFlag::eSCENE_QUERY_SHAPE, true);
 					++it;
 					++itact;
+					++itjoint;
 				}
 
 			}
@@ -821,7 +880,7 @@ PxRigidDynamic* KinectHandle::CreateSphere(const PxVec3& pos, const PxReal radiu
 	PxTransform transform(pos, PxQuat::createIdentity());
 	PxSphereGeometry geometry(radius);
 
-	PxMaterial* mMaterial = gPhysicsSDK->createMaterial(0.5, 0.5, 0.5);
+	PxMaterial* mMaterial = gPhysicsSDK->createMaterial(10000.0, 10000.0, 1.0);
 
 	PxRigidDynamic* actor = PxCreateDynamic(*gPhysicsSDK, transform, geometry, *mMaterial, density);
 
