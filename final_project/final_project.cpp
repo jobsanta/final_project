@@ -62,8 +62,9 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		return 0;
 	}
 
-	//ShowWindow(hWnd, nCmdShow);
-	//UpdateWindow(hWnd);
+	// Full Screen commented this
+	ShowWindow(hWnd, nCmdShow);
+	UpdateWindow(hWnd);
 
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_FINAL_PROJECT));
 

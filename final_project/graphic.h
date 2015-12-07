@@ -19,8 +19,10 @@
 
 #include <Optional\DXUTShapes.h>
 
-#include "Box.h"
-
+//#include "Box.h"
+#include "modelclass.h"
+#include "lightclass.h"
+#include "lightshaderclass.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d10.lib")
@@ -65,6 +67,7 @@ private:
 	float                        g_EyeSeparation;
 	float                        g_Separation;
 	float                        g_Convergence;
+	float						 g_CameraDistance;
 	nv::StereoParametersD3D10    g_StereoParamD3D10;
 
 	// Directx and Effect
@@ -111,9 +114,10 @@ private:
 
 	PxVisualDebuggerConnection* theConnection;
 
-	Box          mBox;
 	TerrainClass terrain;
-	TextureClass* m_Texture;
+	ModelClass* m_Model;
+	LightShaderClass* m_LightShader;
+	LightClass* m_Light;
 
 	ID3DX10Mesh* sphere;
 

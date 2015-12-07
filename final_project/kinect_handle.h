@@ -5,6 +5,10 @@
 #include <Kinect.h>
 #include <Kinect.Face.h>
 
+#include <d3d10.h>
+#include <D3DX10.h>
+#include <DxErr.h>
+#include "d3dUtil.h"
 //OpenCV Library
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
@@ -150,6 +154,9 @@ private:
 	float								face_z;
 
 	void setupFiltering(PxRigidActor* actor, PxU32 filterGroup, PxU32 filterMask);
+
+
+	void HandEncoding(float* HandParameter, D3DXVECTOR4* output);
 
 
 };

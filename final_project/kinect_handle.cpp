@@ -6,9 +6,10 @@ static const float c_FaceTextLayoutOffsetX = -0.1f;
 static const float c_FaceTextLayoutOffsetY = -0.125f;
 
 static const float particleSize = 0.2f;
+static const float particleRadius = 0.01f;
 
-static const float height = 1.10;
-static const float degree = 60.0f;
+static const float height = 1.05;
+static const float degree = 65.0f;
 static const float interact_limit_y = 5.0f; // in 10 CM
 static const float interact_limit_y2 = 0.1f; // in 10 CM
 static const float interact_limit_Z = -5.0f;
@@ -1063,5 +1064,187 @@ void KinectHandle::getFaceResult(float* x, float* y , float* z)
 	*y = face_y -0.5f;
 	*z = face_z +0.5f;
 }
+
+
+void KinectHandle::HandEncoding(float* HandParameter, D3DXVECTOR4* output)
+{
+	//D3DXMATRIX index_offset, middle_offset, ring_offset, pinky_offset, thumb_offset;
+	//D3DXMatrixTranslation(&index_offset, -particleRadius*0.25f, particleRadius*1.0f, 0.0f);
+	//D3DXMatrixTranslation(&middle_offset, 0.0f, particleRadius*1.2f, 0.0f);
+	//D3DXMatrixTranslation(&ring_offset, particleRadius*0.25f, particleRadius*1.0f, 0.0f);
+	//D3DXMatrixTranslation(&pinky_offset, particleRadius*0.5f, particleRadius*0.6, 0.0f);
+	D3DXMATRIX index_offset, middle_offset, ring_offset, pinky_offset, thumb_offset;
+	D3DXMatrixTranslation(&index_offset, 0.0f, particleRadius*1.2f, 0.0f);
+	D3DXMatrixTranslation(&middle_offset, 0.0f, particleRadius*1.4f, 0.0f);
+	D3DXMatrixTranslation(&ring_offset, 0.0f, particleRadius*1.2f, 0.0f);
+	D3DXMatrixTranslation(&pinky_offset, 0.0f, particleRadius, 0.0f);
+
+	D3DXMatrixTranslation(&thumb_offset, -particleRadius*0.5, particleRadius*1.2, 0.0f);
+
+	//World Coordinate -Palm
+	D3DXMATRIX global_translate;
+	D3DXMatrixTranslation(&global_translate, HandParameter[0], HandParameter[1], HandParameter[2]);
+
+	D3DXMATRIX global_rotate, global;
+	D3DXQUATERNION global_quaternion;
+	global_quaternion.x = HandParameter[3];
+	global_quaternion.y = HandParameter[4];
+	global_quaternion.z = HandParameter[5];
+	global_quaternion.w = HandParameter[6];
+	D3DXQuaternionNormalize(&global_quaternion, &global_quaternion);
+	D3DXMatrixRotationQuaternion(&global_rotate, &global_quaternion);
+
+	global = global_rotate* global_translate;
+
+	// index_finger
+	D3DXMATRIX index_rotate[3], index_transform[3], index_final[6], index_position;
+
+	D3DXMatrixRotationYawPitchRoll(&index_rotate[0], 0.0f, HandParameter[7], HandParameter[8]);
+	index_transform[0] = index_offset*index_rotate[0];
+
+	D3DXMatrixRotationYawPitchRoll(&index_rotate[1], 0.0f, HandParameter[9], 0.0f);
+	index_transform[1] = index_offset * index_rotate[1];
+
+	D3DXMatrixRotationYawPitchRoll(&index_rotate[2], 0.0f, HandParameter[10], 0.0f);
+	index_transform[2] = index_offset * index_rotate[2];
+
+	D3DXMatrixTranslation(&index_position, -particleRadius * 2.5, particleRadius * 6, 0.0f);
+	index_final[0] = index_transform[0] * (index_position* global);
+	index_final[1] = index_offset * index_final[0];
+	index_final[2] = index_offset * index_final[1];
+	index_final[3] = index_transform[1] * index_final[2];
+	index_final[4] = index_offset * index_final[3];
+	index_final[5] = index_transform[2] * index_final[4];
+
+	// middle_finger
+	D3DXMATRIX middle_rotate[3], middle_transform[3], middle_final[6], middle_position;
+
+	D3DXMatrixRotationYawPitchRoll(&middle_rotate[0], 0.0f, HandParameter[11], HandParameter[12]);
+	middle_transform[0] = middle_offset*middle_rotate[0];
+
+	D3DXMatrixRotationYawPitchRoll(&middle_rotate[1], 0.0f, HandParameter[13], 0.0f);
+	middle_transform[1] = middle_offset * middle_rotate[1];
+
+	D3DXMatrixRotationYawPitchRoll(&middle_rotate[2], 0.0f, HandParameter[14], 0.0f);
+	middle_transform[2] = middle_offset * middle_rotate[2];
+
+	D3DXMatrixTranslation(&middle_position, -particleRadius*0.5, particleRadius * 6, 0.0f);
+	middle_final[0] = middle_transform[0] * (middle_position* global);
+	middle_final[1] = middle_offset * middle_final[0];
+	middle_final[2] = middle_offset * middle_final[1];
+	middle_final[3] = middle_transform[1] * middle_final[2];
+	middle_final[4] = middle_offset * middle_final[3];
+	middle_final[5] = middle_transform[2] * middle_final[4];
+
+	// ring_finger
+	D3DXMATRIX ring_rotate[3], ring_transform[3], ring_final[6], ring_position;
+
+	D3DXMatrixRotationYawPitchRoll(&ring_rotate[0], 0.0f, HandParameter[15], HandParameter[16]);
+	ring_transform[0] = ring_offset*ring_rotate[0];
+
+	D3DXMatrixRotationYawPitchRoll(&ring_rotate[1], 0.0f, HandParameter[17], 0.0f);
+	ring_transform[1] = ring_offset * ring_rotate[1];
+
+	D3DXMatrixRotationYawPitchRoll(&ring_rotate[2], 0.0f, HandParameter[18], 0.00);
+	ring_transform[2] = ring_offset * ring_rotate[2];
+
+	D3DXMatrixTranslation(&ring_position, particleRadius*1.5, particleRadius * 6, 0.0f);
+	ring_final[0] = ring_transform[0] * (ring_position* global);
+	ring_final[1] = ring_offset * ring_final[0];
+	ring_final[2] = ring_offset * ring_final[1];
+	ring_final[3] = ring_transform[1] * ring_final[2];
+	ring_final[4] = ring_offset * ring_final[3];
+	ring_final[5] = ring_transform[2] * ring_final[4];
+
+
+	//Pinky finger
+	D3DXMATRIX pinky_rotate[3], pinky_transform[3], pinky_final[6], pinky_position;
+
+	D3DXMatrixRotationYawPitchRoll(&pinky_rotate[0], 0.0f, HandParameter[19], HandParameter[20]);
+	pinky_transform[0] = pinky_offset*pinky_rotate[0];
+
+	D3DXMatrixRotationYawPitchRoll(&pinky_rotate[1], 0.0f, HandParameter[21], 0.0f);
+	pinky_transform[1] = pinky_offset * pinky_rotate[1];
+
+	D3DXMatrixRotationYawPitchRoll(&pinky_rotate[2], 0.0f, HandParameter[22], 0.0f);
+	pinky_transform[2] = pinky_offset * pinky_rotate[2];
+
+	D3DXMatrixTranslation(&pinky_position, particleRadius*3.5, particleRadius* 5.5, 0.0f);
+	pinky_final[0] = pinky_transform[0] * (pinky_position* global);
+	pinky_final[1] = pinky_offset * pinky_final[0];
+	pinky_final[2] = pinky_offset * pinky_final[1];
+	pinky_final[3] = pinky_transform[1] * pinky_final[2];
+	pinky_final[4] = pinky_offset * pinky_final[3];
+	pinky_final[5] = pinky_transform[2] * pinky_final[4];
+
+
+	//thumb
+	D3DXMATRIX thumb_rotate[3], thumb_transform[3], thumb_final[8], thumb_position;
+
+	D3DXMatrixRotationYawPitchRoll(&thumb_rotate[0], 0.0f, HandParameter[23], HandParameter[24]);
+	thumb_transform[0] = thumb_offset*thumb_rotate[0];
+
+	D3DXMatrixRotationYawPitchRoll(&thumb_rotate[1], 0.0f, HandParameter[25], 0.0f);
+	thumb_transform[1] = thumb_offset * thumb_rotate[1];
+
+	D3DXMatrixRotationYawPitchRoll(&thumb_rotate[2], 0.0f, HandParameter[26], 0.0f);
+	thumb_transform[2] = thumb_offset * thumb_rotate[2];
+
+	D3DXMatrixTranslation(&thumb_position, -particleRadius * 3, -particleRadius * 4.0, particleRadius);
+	thumb_final[0] = thumb_transform[0] * (thumb_position* global);
+	thumb_final[1] = thumb_offset * thumb_final[0];
+	thumb_final[2] = thumb_offset * thumb_final[1];
+	thumb_final[3] = thumb_offset * thumb_final[2];
+	thumb_final[4] = thumb_offset * thumb_final[3];
+	thumb_final[5] = thumb_transform[1] * thumb_final[4];
+	thumb_final[6] = thumb_offset * thumb_final[5];
+	thumb_final[7] = thumb_transform[2] * thumb_final[6];
+
+
+	D3DXVECTOR4 palm[16];
+
+
+	palm[6] = D3DXVECTOR4(particleRadius*2.25f, -particleRadius * 6, 0.0f, 1.0f);
+	palm[7] = D3DXVECTOR4(-particleRadius*2.25f, -particleRadius * 6, 0.0f, 1.0f);
+	palm[10] = D3DXVECTOR4(particleRadius*0.75, -particleRadius * 6, 0.0f, 1.0f);
+	palm[11] = D3DXVECTOR4(-particleRadius*0.75, -particleRadius * 6, 0.0f, 1.0f);
+
+	palm[14] = D3DXVECTOR4(particleRadius * 3, -particleRadius * 2, 0.0f, 1.0f);
+	palm[15] = D3DXVECTOR4(-particleRadius * 3, -particleRadius * 2, 0.0f, 1.0f);
+	palm[2] = D3DXVECTOR4(particleRadius, -particleRadius * 2, 0.0f, 1.0f);
+	palm[3] = D3DXVECTOR4(-particleRadius, -particleRadius * 2, 0.0f, 1.0f);
+
+	palm[12] = D3DXVECTOR4(particleRadius * 3, particleRadius * 2, 0.0f, 1.0f);
+	palm[13] = D3DXVECTOR4(-particleRadius * 3, particleRadius * 2, 0.0f, 1.0f);
+	palm[0] = D3DXVECTOR4(particleRadius, particleRadius * 2, 0.0f, 1.0f);
+	palm[1] = D3DXVECTOR4(-particleRadius, particleRadius * 2, 0.0f, 1.0f);
+
+	palm[4] = D3DXVECTOR4(particleRadius * 3, particleRadius * 6, 0.0f, 1.0f);
+	palm[5] = D3DXVECTOR4(-particleRadius * 3, particleRadius * 6, 0.0f, 1.0f);
+	palm[8] = D3DXVECTOR4(particleRadius, particleRadius * 6, 0.0f, 1.0f);
+	palm[9] = D3DXVECTOR4(-particleRadius, particleRadius * 6, 0.0f, 1.0f);
+
+
+	D3DXVECTOR4 origin = D3DXVECTOR4(0, 0, 0, 1.0);
+
+	for (int i = 0; i < 16; i++)
+		D3DXVec4Transform(&output[i], &palm[i], &global);
+
+	for (int i = 0; i < 6; i++)
+	{
+		D3DXVec4Transform(&output[i + 16], &origin, &index_final[i]);
+		D3DXVec4Transform(&output[i + 22], &origin, &middle_final[i]);
+		D3DXVec4Transform(&output[i + 28], &origin, &ring_final[i]);
+		D3DXVec4Transform(&output[i + 34], &origin, &pinky_final[i]);
+
+	}
+
+	for (int i = 0; i < 8; i++)
+		D3DXVec4Transform(&output[i + 40], &origin, &thumb_final[i]);
+
+}
+
+
+
 
 
