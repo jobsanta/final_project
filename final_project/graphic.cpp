@@ -1,6 +1,6 @@
 #include "graphic.h"
 
-const float BoxSize = 0.50f;
+const float BoxSize = 0.25f;
 
 Graphic::Graphic()
 {
@@ -86,6 +86,7 @@ void Graphic::buildFX()
 	mTech_Sphere = mFX_Sphere->GetTechniqueByName("ColorTech");
 	mfxWVPVar_Sphere = mFX_Sphere->GetVariableByName("gWVP")->AsMatrix();
 	mfxCameraDistance_Sphere = mFX_Sphere->GetVariableByName("cameraDepth")->AsScalar();
+	mfxColor_Sphere = mFX_Sphere->GetVariableByName("gColor")->AsVector();
 }
 
 void Graphic::buildVertexLayouts()
@@ -191,18 +192,17 @@ bool Graphic::CreateDevice(HWND g_hWnd)
 	g_DXGISwapChainDesc.SampleDesc.Quality = 0;
 
 
-	RECT rect;
-	GetWindowRect(g_hWnd, &rect);
-
-	g_DXGISwapChainDesc.Windowed = true;
-	g_DXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = devMode.dmDisplayFrequency;
-	g_DXGISwapChainDesc.BufferDesc.Width = rect.right - rect.left;
-	g_DXGISwapChainDesc.BufferDesc.Height = rect.bottom - rect.top;
+	//RECT rect;
+	//GetWindowRect(g_hWnd, &rect);
+	//g_DXGISwapChainDesc.Windowed = true;
+	//g_DXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = devMode.dmDisplayFrequency;
+	//g_DXGISwapChainDesc.BufferDesc.Width = rect.right - rect.left;
+	//g_DXGISwapChainDesc.BufferDesc.Height = rect.bottom - rect.top;
 	////// Fullscreen mode mode
-	//g_DXGISwapChainDesc.Windowed = FALSE;
-	////g_DXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = devMode.dmDisplayFrequency;
-	//g_DXGISwapChainDesc.BufferDesc.Width = devMode.dmPelsWidth;
-	//g_DXGISwapChainDesc.BufferDesc.Height = devMode.dmPelsHeight;
+	g_DXGISwapChainDesc.Windowed = FALSE;
+	//g_DXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = devMode.dmDisplayFrequency;
+	g_DXGISwapChainDesc.BufferDesc.Width = devMode.dmPelsWidth;
+	g_DXGISwapChainDesc.BufferDesc.Height = devMode.dmPelsHeight;
 
 	hr = D3D10CreateDeviceAndSwapChain(
 		capableAdapter,
@@ -458,11 +458,23 @@ void Graphic::Render(float x, float y, float z)
 
 	g_D3D10Device->OMSetRenderTargets(1, &g_D3D10BackBufferRTV, g_D3D10DepthBufferDSV);
 
+
+
 	if (frameNb > 2)
 	{
-
-		if (gScene && frameNb > 20)
+		if (frameNb <= 20)
 		{
+			start_time = milliseconds_now();
+		}
+		long long timeSinceStart = milliseconds_now() - start_time;
+		float deltaTime = (timeSinceStart - oldTimeSinceStart) / 1000.0f;
+		oldTimeSinceStart = timeSinceStart;
+
+		mAccumulator += deltaTime;
+
+		while (mAccumulator > myTimestep) //Simulate at not more than 'gTimeStep' time-interval 
+		{
+			mAccumulator -= myTimestep;
 			StepPhysX();
 		}
 
@@ -486,7 +498,6 @@ void Graphic::Render(float x, float y, float z)
 			}
 			boxesJoint.clear();
 			particleJoint.clear();
-
 		}
 
 
@@ -518,7 +529,7 @@ void Graphic::Render(float x, float y, float z)
 
 
 
-		D3DXMatrixTranslation(&mat, -50.0, 0.35, -50.0);
+		D3DXMatrixTranslation(&mat, -50.0, 0 , -50.0);
 		mWVP = mat* mView*mProj;
 		mfxWVPVar_Box->SetMatrix((float*)&mWVP);
 		mfxCameraDistance_Box->SetFloat(z);
@@ -560,6 +571,9 @@ void Graphic::InitializePhysX()
 
 	gFoundation = PxCreateFoundation(PX_PHYSICS_VERSION, gDefaultAllocatorCallback, gDefaultErrorCallback);
 
+
+	static PxProfileZoneManager *mProfileZoneManager = &PxProfileZoneManager::createProfileZoneManager(gFoundation);
+
 	gPhysicsSDK = PxCreatePhysics(PX_PHYSICS_VERSION, *gFoundation, PxTolerancesScale());
 	if (gPhysicsSDK == NULL) {
 		cerr << "Error creating PhysX3 device." << endl;
@@ -588,7 +602,7 @@ void Graphic::InitializePhysX()
 	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);
 
 	if (!sceneDesc.cpuDispatcher) {
-		PxDefaultCpuDispatcher* mCpuDispatcher = PxDefaultCpuDispatcherCreate(3);
+		PxDefaultCpuDispatcher* mCpuDispatcher = PxDefaultCpuDispatcherCreate(4);
 		if (!mCpuDispatcher)
 			cerr << "PxDefaultCpuDispatcherCreate failed!" << endl;
 		sceneDesc.cpuDispatcher = mCpuDispatcher;
@@ -597,6 +611,21 @@ void Graphic::InitializePhysX()
 		sceneDesc.filterShader = customFilterShader;//gDefaultFilterShader;
 	sceneDesc.simulationEventCallback = this;
 	sceneDesc.flags |= PxSceneFlag::eENABLE_CCD;
+
+	PxCudaContextManagerDesc cudaContextManagerDesc;
+	PxCudaContextManager* mCudaContextManager = PxCreateCudaContextManager(*gFoundation, cudaContextManagerDesc, mProfileZoneManager);
+	if (mCudaContextManager){
+		if (!mCudaContextManager->contextIsValid()){
+			mCudaContextManager->release();
+			mCudaContextManager = NULL;
+
+			exit(EXIT_FAILURE);
+		}
+
+		if (!sceneDesc.gpuDispatcher){
+			sceneDesc.gpuDispatcher = mCudaContextManager->getGpuDispatcher();
+		}
+	}
 
 
 	gScene = gPhysicsSDK->createScene(sceneDesc);
@@ -607,12 +636,12 @@ void Graphic::InitializePhysX()
 	gScene->setVisualizationParameter(PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
 
 
-	PxMaterial* mMaterial = gPhysicsSDK->createMaterial(100, 100, 0.5);
+	PxMaterial* mMaterial = gPhysicsSDK->createMaterial(1, 1, 0.5);
 
 	//Create actors 
 	//1) Create ground plane
 	PxReal d = 0.0f;
-	PxTransform pose = PxTransform(PxVec3(0.0f, 0.35f, 0.0f), PxQuat(PxHalfPi, PxVec3(0.0f, 0.0f, 1.0f)));
+	PxTransform pose = PxTransform(PxVec3(0.0f, 0.0f, 0.0f), PxQuat(PxHalfPi, PxVec3(0.0f, 0.0f, 1.0f)));
 
 	PxRigidStatic* plane = gPhysicsSDK->createRigidStatic(pose);
 	if (!plane)
@@ -623,17 +652,17 @@ void Graphic::InitializePhysX()
 		cerr << "create shape failed!" << endl;
 	gScene->addActor(*plane);
 
-	pose = PxTransform(PxVec3(0.0f, 0, 0.0f), PxQuat(PxHalfPi, PxVec3(0.0f, 1.0f, 0.0f)));
+	//pose = PxTransform(PxVec3(0.0f, 0, 0.0f), PxQuat(PxHalfPi, PxVec3(0.0f, 1.0f, 0.0f)));
 
-	PxRigidStatic* plane2 = gPhysicsSDK->createRigidStatic(pose);
-	if (!plane)
-		cerr << "create plane failed!" << endl;
+	//PxRigidStatic* plane2 = gPhysicsSDK->createRigidStatic(pose);
+	//if (!plane)
+	//	cerr << "create plane failed!" << endl;
 
-	PxShape* shape2 = plane2->createShape(PxPlaneGeometry(), *mMaterial);
-	if (!shape)
-		cerr << "create shape failed!" << endl;
-	gScene->addActor(*plane2);
-	
+	//PxShape* shape2 = plane2->createShape(PxPlaneGeometry(), *mMaterial);
+	//if (!shape)
+	//	cerr << "create shape failed!" << endl;
+	//gScene->addActor(*plane2);
+	//
 	//2)           Create cube	 
 	PxReal         density = 1.0f;
 	PxTransform    transform(PxVec3(0.0f, 10.0f, 0.0f), PxQuat::createIdentity());
@@ -643,8 +672,9 @@ void Graphic::InitializePhysX()
 
 	for (int i = 0; i < 2; i++)
 	{
-		transform.p = PxVec3(-1.0f+2.0f * i, 1.0f, -3.0f);
+		transform.p = PxVec3(-1.0f+2.0f * i, 3.0f, -2.0f);
 		PxRigidDynamic *actor = PxCreateDynamic(*gPhysicsSDK, transform, geometry, *mMaterial, density);
+		actor->setMass(0.5);
 
 		actor->setAngularDamping(0.75);
 		actor->setMass(1.0);
@@ -679,6 +709,19 @@ void Graphic::ShutdownPhysX() {
 
 	//if (theConnection!=NULL)
 	//	theConnection->release();
+}
+
+long long Graphic::milliseconds_now() {
+	static LARGE_INTEGER s_frequency;
+	static BOOL s_use_qpc = QueryPerformanceFrequency(&s_frequency);
+	if (s_use_qpc) {
+		LARGE_INTEGER now;
+		QueryPerformanceCounter(&now);
+		return (1000LL * now.QuadPart) / s_frequency.QuadPart;
+	}
+	else {
+		return GetTickCount();
+	}
 }
 
 void Graphic::StepPhysX()
@@ -748,7 +791,7 @@ void Graphic::DrawBox(PxShape* pShape, PxRigidActor* actor)
 
 }
 
-void Graphic::DrawSphere(PxShape* pShape, PxRigidActor* actor)
+void Graphic::DrawSphere(PxRigidActor* actor , int index)
 {
 	
 	PxTransform pT =  actor->getGlobalPose();
@@ -756,13 +799,36 @@ void Graphic::DrawSphere(PxShape* pShape, PxRigidActor* actor)
 
 	mWVP = mat* mView*mProj;
 	mfxWVPVar_Sphere->SetMatrix((float*)&mWVP);
-
+	if (index < 16)
+	{
+		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)GREEN));
+	}
+	else if (index >= 16 && index < 22)
+	{
+		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)RED));
+	}
+	else if (index >= 22 && index < 28)
+	{
+		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)BLUE));
+	}
+	else if (index >= 28 && index < 34)
+	{
+		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)CYAN));
+	}
+	else if (index >= 34 && index < 40)
+	{
+		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)MAGENTA));
+	}
+	else if (index >= 40)
+	{
+		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)YELLOW));
+	}
+	
 	D3D10_TECHNIQUE_DESC techDesc;
 	mTech_Sphere->GetDesc(&techDesc);
 	for (UINT p = 0; p < techDesc.Passes; ++p)
 	{
 		mTech_Sphere->GetPassByIndex(p)->Apply(0);
-
 		sphere->DrawSubset(0);
 	}
 }
@@ -775,12 +841,12 @@ void Graphic::DrawShape(PxShape* shape, PxRigidActor* actor)
 	case PxGeometryType::eBOX:
 		DrawBox(shape, actor);
 		break;
-	case PxGeometryType::eSPHERE:
-		DrawSphere(shape, actor);
-		break;
-	case PxGeometryType::eINVALID:
-		DrawSphere(shape, actor);
-		break;
+	//case PxGeometryType::eSPHERE:
+	//	DrawSphere(shape, actor);
+	//	break;
+	//case PxGeometryType::eINVALID:
+	//	DrawSphere(shape, actor);
+	//	break;
 	}
 }
 
@@ -803,8 +869,9 @@ void Graphic::RenderActors(bool proxy)
 		DrawActor(boxes[i]);
 
 	if (proxy)
-	for (int i = 0; i < proxyParticle.size(); i++)
-		DrawActor(proxyParticle[i]);
+		for (int i = 0; i < proxyParticle.size(); i++)
+			DrawSphere(proxyParticle[i], i);
+		//DrawActor(proxyParticle[i]);
 }
 
 PxPhysics* Graphic::getPhysicsSDK()
@@ -824,7 +891,8 @@ void Graphic::SetProxyActor(vector<PxRigidActor*> proxyParticleActor)
 
 void Graphic::onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs)
 {
-	cout << nbPairs << " Contact pair(s) detected\n";
+	//cout << nbPairs << " Contact pair(s) detected\n";
+	//return;
 
 	const PxU32 buff = 64; //buffer size
 	PxContactPairPoint contacts[buff];

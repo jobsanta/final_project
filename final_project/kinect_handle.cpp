@@ -1,14 +1,18 @@
+#include "stdafx.h"
 #include "kinect_handle.h"
+
+
+//#define USE_PARTICLE true
 
 static const float c_FaceTextLayoutOffsetX = -0.1f;
 
 // face property text layout offset in Y axis
 static const float c_FaceTextLayoutOffsetY = -0.125f;
 
-static const float particleSize = 0.2f;
+static const float particleSize = 0.1f;
 static const float particleRadius = 0.01f;
 
-static const float height = 1.05;
+static const float height = 0.95f;
 static const float degree = 65.0f;
 static const float interact_limit_y = 5.0f; // in 10 CM
 static const float interact_limit_y2 = 0.1f; // in 10 CM
@@ -28,6 +32,13 @@ FaceFrameFeatures::FaceFrameFeatures_BoundingBoxInColorSpace
 | FaceFrameFeatures::FaceFrameFeatures_LookingAway
 | FaceFrameFeatures::FaceFrameFeatures_Glasses
 | FaceFrameFeatures::FaceFrameFeatures_FaceEngagement;
+
+#define DBOUT( s )            \
+{                             \
+   std::wostringstream os_;    \
+   os_ << s;                   \
+   OutputDebugStringW( os_.str().c_str() );  \
+}
 
 KinectHandle::KinectHandle()
 {
@@ -54,6 +65,8 @@ KinectHandle::KinectHandle()
 
 	// create heap storage for the coorinate mapping from color to depth
 	m_pDepthCoordinates = new DepthSpacePoint[cColorWidth * cColorHeight];
+
+	tracker = new Tracker();
 
 	for (int i = 0; i < BODY_COUNT; i++)
 	{
@@ -94,12 +107,13 @@ HRESULT KinectHandle::InitOpenCV()
 HRESULT KinectHandle::Initialize(PxPhysics* sdk, PxScene* scene)
 {
 	HRESULT hr;
-	hr = CreateFirstConnected();
+	hr = InitOpenCV();
 	if (SUCCEEDED(hr))
 	{
-		hr = InitOpenCV();
+
 		InitPhysx(sdk, scene);
-	}
+	}	
+	hr = CreateFirstConnected();
 	return hr;
 }
 /// <summary>
@@ -131,29 +145,27 @@ HRESULT KinectHandle::CreateFirstConnected()
 		{
 			hr = m_pKinectSensor->OpenMultiSourceFrameReader(
 				FrameSourceTypes::FrameSourceTypes_Depth |
-				FrameSourceTypes::FrameSourceTypes_Color |
-				FrameSourceTypes::FrameSourceTypes_BodyIndex |
-				FrameSourceTypes::FrameSourceTypes_Body,
+				FrameSourceTypes::FrameSourceTypes_Color,
 				&m_pMultiSourceFrameReader);
 		}
 
-		if (SUCCEEDED(hr))
-		{
-			// create a face frame source + reader to track each body in the fov
-			for (int i = 0; i < BODY_COUNT; i++)
-			{
-				if (SUCCEEDED(hr))
-				{
-					// create the face frame source by specifying the required face frame features
-					hr = CreateFaceFrameSource(m_pKinectSensor, 0, c_FaceFrameFeatures, &m_pFaceFrameSources[i]);
-				}
-				if (SUCCEEDED(hr))
-				{
-					// open the corresponding reader
-					hr = m_pFaceFrameSources[i]->OpenReader(&m_pFaceFrameReaders[i]);
-				}
-			}
-		}
+		//if (SUCCEEDED(hr))
+		//{
+		//	// create a face frame source + reader to track each body in the fov
+		//	for (int i = 0; i < BODY_COUNT; i++)
+		//	{
+		//		if (SUCCEEDED(hr))
+		//		{
+		//			// create the face frame source by specifying the required face frame features
+		//			hr = CreateFaceFrameSource(m_pKinectSensor, 0, c_FaceFrameFeatures, &m_pFaceFrameSources[i]);
+		//		}
+		//		if (SUCCEEDED(hr))
+		//		{
+		//			// open the corresponding reader
+		//			hr = m_pFaceFrameSources[i]->OpenReader(&m_pFaceFrameReaders[i]);
+		//		}
+		//	}
+		//}
 	}
 
 	if (!m_pKinectSensor || FAILED(hr))
@@ -224,31 +236,6 @@ HRESULT KinectHandle::KinectProcess()
 		SafeRelease(pColorFrameReference);
 	}
 
-	//Get Body Index
-	if (SUCCEEDED(hr))
-	{
-		IBodyIndexFrameReference* pBodyIndexFrameReference = NULL;
-
-		hr = pMultiSourceFrame->get_BodyIndexFrameReference(&pBodyIndexFrameReference);
-		if (SUCCEEDED(hr))
-		{
-			hr = pBodyIndexFrameReference->AcquireFrame(&pBodyIndexFrame);
-		}
-
-		SafeRelease(pBodyIndexFrameReference);
-	}
-
-	if (SUCCEEDED(hr))
-	{
-		IBodyFrameReference* pBodyFrameReference = NULL;
-		hr = pMultiSourceFrame->get_BodyFrameReference(&pBodyFrameReference);
-		if (SUCCEEDED(hr))
-		{
-			hr = pBodyFrameReference->AcquireFrame(&pBodyFrame);
-		}
-		SafeRelease(pBodyFrameReference);
-	}
-
 
 	// If all succeeded combine frame
 	if (SUCCEEDED(hr))
@@ -257,6 +244,8 @@ HRESULT KinectHandle::KinectProcess()
 		IFrameDescription*    pDepthFrameDescription = NULL;
 		int                   nDepthWidth            = 0;
 		int                   nDepthHeight           = 0;
+		USHORT	              nMaxDistance           = 0;
+		USHORT                nMinDistance           = 0;
 		UINT                  nDepthBufferSize       = 0;
 		UINT16                *pDepthBuffer          = NULL;
 
@@ -267,17 +256,11 @@ HRESULT KinectHandle::KinectProcess()
 		UINT               nColorBufferSize       = 0;
 		RGBQUAD            *pColorBuffer          = NULL;
 
-		IFrameDescription* pBodyIndexFrameDescription = NULL;
-		int                nBodyIndexWidth            = 0;
-		int                nBodyIndexHeight           = 0;
-		UINT               nBodyIndexBufferSize       = 0;
-		BYTE               *pBodyIndexBuffer          = NULL;
-
-		INT64				nBodyTime = 0;
-		IBody* ppBodies[BODY_COUNT] = { 0 };
 
 
 		pDepthFrame->get_RelativeTime(&nDepthTime);
+		pDepthFrame->get_DepthMaxReliableDistance(&nMaxDistance);
+		pDepthFrame->get_DepthMinReliableDistance(&nMinDistance);
 		hr = pDepthFrame->get_FrameDescription(&pDepthFrameDescription);
 		
 		if (SUCCEEDED(hr))
@@ -319,109 +302,224 @@ HRESULT KinectHandle::KinectProcess()
 			}
 		}
 
-		if (SUCCEEDED(hr))
-		{
-			hr = pBodyIndexFrame->get_FrameDescription(&pBodyIndexFrameDescription);
-		}
-
-		if (SUCCEEDED(hr))
-		{
-			hr = pBodyIndexFrameDescription->get_Width(&nBodyIndexWidth);
-		}
-
-		if (SUCCEEDED(hr))
-		{
-			hr = pBodyIndexFrameDescription->get_Height(&nBodyIndexHeight);
-		}
-
-		if (SUCCEEDED(hr))
-		{
-			hr = pBodyIndexFrame->AccessUnderlyingBuffer(&nBodyIndexBufferSize, &pBodyIndexBuffer);
-		}
-
-		if (SUCCEEDED(hr))
-		{
-			hr = pBodyFrame->GetAndRefreshBodyData(_countof(ppBodies), ppBodies);
-		}
-
 
 		if (SUCCEEDED(hr))
 		{
 			gotFace = FALSE;// ProcessFaces(pMultiSourceFrame);
 			ProcessFrame(nDepthTime, pDepthBuffer, nDepthWidth, nDepthHeight,
 				pColorBuffer, nColorWidth, nColorHeight,
-				pBodyIndexBuffer, nBodyIndexWidth, nBodyIndexHeight, ppBodies, BODY_COUNT, Last_u, Last_v);
+				Last_u, Last_v,nMinDistance,nMaxDistance);
 		}
 
-		for (int i = 0; i < _countof(ppBodies); ++i)
-		{
-			SafeRelease(ppBodies[i]);
-		}
 		SafeRelease(pDepthFrameDescription);
 		SafeRelease(pColorFrameDescription);
-		SafeRelease(pBodyIndexFrameDescription);
 	}
 
 	SafeRelease(pDepthFrame);
 	SafeRelease(pColorFrame);
-	SafeRelease(pBodyIndexFrame);
-	SafeRelease(pBodyFrame);
 	SafeRelease(pMultiSourceFrame);
 	
-
+#ifdef USE_PARTICLE 
 	ParticleCompute();
+#endif
 	return hr;
 
 }
 
 void KinectHandle::ProcessFrame(INT64 nTime,
-	const UINT16* pDepthBuffer, int nDepthWidth, int nDepthHeight,
-	const RGBQUAD* pColorBuffer, int nColorWidth, int nColorHeight,
-	const BYTE* pBodyIndexBuffer, int nBodyIndexWidth, int nBodyIndexHeight, IBody** ppBodies, int nBodyCount, Mat&u, Mat&v)
+	UINT16* pDepthBuffer, int nDepthWidth, int nDepthHeight,
+	RGBQUAD* pColorBuffer, int nColorWidth, int nColorHeight,
+	Mat&u, Mat&v, USHORT nMinDistance, USHORT nMaxDistance)
 {
 
 	if (m_pCoordinateMapper && m_pDepthCoordinates && m_pOutputRGBX &&
 		pDepthBuffer && (nDepthWidth == cDepthWidth) && (nDepthHeight == cDepthHeight) &&
-		pColorBuffer && (nColorWidth == cColorWidth) && (nColorHeight == cColorHeight) &&
-		pBodyIndexBuffer && (nBodyIndexWidth == cDepthWidth) && (nBodyIndexHeight == cDepthHeight))
+		pColorBuffer && (nColorWidth == cColorWidth) && (nColorHeight == cColorHeight))
 	{
-		HRESULT hr = m_pCoordinateMapper->MapColorFrameToDepthSpace(nDepthWidth * nDepthHeight, (UINT16*)pDepthBuffer, nColorWidth * nColorHeight, m_pDepthCoordinates);
+		tracker->setKinectParameter(nDepthWidth, nDepthHeight, nColorWidth, nColorHeight, nMinDistance, nMaxDistance, pDepthBuffer, pColorBuffer, m_pCoordinateMapper);
 		
-		if (SUCCEEDED(hr))
+		Point3d headPoint;
+		if (tracker->headTrack(headPoint))
 		{
+			face_x = headPoint.x*10.0;
+			face_y = headPoint.y*10.0 + 10;
+			face_z = headPoint.z*10.0;
+		}
+		DepthSpacePoint headPoint_depth;
 
 
-			for (int i = 0; i < nBodyCount; ++i)
+		int boxSize = 100;
+		int halfBoxSize = boxSize / 2.0f;
+
+
+
+		
+#ifndef USE_PARTICLE
+
+
+		////Simple Background subtraction, only the object in the interactive volume is considered
+		//for (int j = 0; j < nDepthHeight; j++)
+		//{
+		//	ushort* p = depthMap.ptr<ushort>(j);
+		//	float* q = img0.ptr<float>(j);
+		//	for (int i = 0; i < nDepthWidth; i++)
+		//	{
+		//		float y = cos(degree * PI / 180.0f)*points[j*nDepthWidth + i].Y - sin(degree * PI / 180.0f)*points[j*nDepthWidth + i].Z + height;
+		//		float z = -sin(degree * PI / 180.0f)*points[j*nDepthWidth + i].Y - cos(degree * PI / 180.0f)*points[j*nDepthWidth + i].Z;
+
+		//		if (y < 0.05 || z < -0.5)
+		//		{
+		//			p[i] = 0;
+		//			q[i] = 0;
+		//		}
+		//	}
+		//}
+		//if (gotHandRight && img0.at<float>(rh_d.Y, rh_d.X) ==0)
+		//	gotHandRight = false;
+
+
+		//float* suggestPosition = new float[7];
+
+		//suggestPosition[0] = rh.X - 0.02;
+		//suggestPosition[1] = cos(degree * PI / 180.0f)*rh.Y - sin(degree * PI / 180.0f)*rh.Z + height - 0.01;
+		//suggestPosition[2] = -sin(degree * PI / 180.0f)*rh.Y - cos(degree * PI / 180.0f)*rh.Z + 0.02;
+		//suggestPosition[3] = temp.x;
+		//suggestPosition[4] = temp.y;
+		//suggestPosition[5] = temp.z;
+		//suggestPosition[6] = temp.w;
+
+		//if (firstRun)
+		//{
+		//	handParameter[0] = suggestPosition[0];
+		//	handParameter[1] = suggestPosition[1];
+		//	handParameter[2] = suggestPosition[2];
+		//	firstRun = false;
+		//}
+
+		//std::free(points);
+
+		//Mat img1, segmented;
+		//img1.create(img0.rows, img0.cols, CV_32FC1);
+		//segmented.create(img0.rows, img0.cols, CV_8UC1);
+		//cv::bilateralFilter(img0, img1, 3, 50, 50);
+		//img1.convertTo(segmented, CV_8UC1, 255);
+		//float result = 99999999;
+
+		if (tracker->detectHand())
+		{
+			DBOUT("\n got hand right");
+			////Compute Distance transform
+			//DepthSpacePoint* depthPoints = new DepthSpacePoint[48];
+			D3DXVECTOR4* output = new D3DXVECTOR4[48];
+			output = tracker->handTrack();
+			//CameraSpacePoint* spacePoint = new CameraSpacePoint[48];
+			//Mat bw, dist;
+			//cv::threshold(segmented, bw, 100, 255, CV_THRESH_BINARY_INV | CV_THRESH_OTSU);
+			//cv::distanceTransform(bw, dist, CV_DIST_L2, 3);
+
+
+			////Random point used in optimization
+			//for (int i = 0; i < 256; i++)
+			//{
+			//	DepthSpacePoint random_surface;
+			//	UINT16 depth;
+			//	do
+			//	{
+			//		DBOUT("\n stuck in the loop");
+			//		float random_x = (((float)rand() / (float)(RAND_MAX)) * 150.0) - 75.0f;
+			//		float random_y = (((float)rand() / (float)(RAND_MAX)) * 150.0f) - 75.0f;
+			//		random_surface.Y = rh_d.Y + random_y;
+			//		random_surface.X = rh_d.X + random_x;
+			//		depth = depthMap.at<ushort>(random_surface.Y, random_surface.X);
+
+			//	} while (depth == 0);
+			//	//circle(segmented, cv::Point(random_surface.X, random_surface.Y), 1, cv::Scalar(255), -1);
+			//	m_pCoordinateMapper->MapDepthPointToCameraSpace(random_surface, depth, &camera_surface[i]);
+			//}
+			//DBOUT("\n start optimized");
+			//handParameter = optimized(handParameter, suggestPosition, cv::Point(rh_d.X, rh_d.Y), rh, depthMap, dist, camera_surface);
+			//HandEncoding(handParameter, output);
+			//DBOUT("\n optimized");
+
+			//If not previously created, create it
+			if (proxyParticle.empty())
 			{
-				IBody* pBody = ppBodies[i];
-				if (pBody)
+				DBOUT("\n first run");
+				//loop thought hand sphere
+				for (int i = 0; i < 48; i++)
 				{
-					BOOLEAN bTracked = false;
-					hr = pBody->get_IsTracked(&bTracked);
+					output[i].x *= 10.0f;
+					output[i].y *= 10.0f;
+					output[i].z *= 10.0f;
+					Particle newParticle = { output[i].x, output[i].y, output[i].z };
+					PxRigidDynamic* newParticleActor = CreateSphere(PxVec3(output[i].x, output[i].y, output[i].z), particleSize, 1.0f);
+					newParticleActor->setRigidDynamicFlag(PxRigidDynamicFlag::eKINEMATIC, true);
+	
 
-					if (SUCCEEDED(hr) && bTracked)
+					PxU32 nShapes = newParticleActor->getNbShapes();
+					PxShape** shapes = new PxShape*[nShapes];
+					newParticleActor->getShapes(shapes, nShapes);
+					
+					while (nShapes--)
 					{
-						i = nBodyCount;
-						Joint joints[JointType_Count];
-						hr = pBody->GetJoints(_countof(joints), joints);
-						if (SUCCEEDED(hr))
-						{
-							CameraSpacePoint j = joints[JointType::JointType_Head].Position;
-							face_x = j.X;//-2.0f + 4.0f*x / (float)cColorWidth;
-							face_y = cos(degree * PI / 180.0f)*j.Y - sin(degree * PI / 180.0f)*j.Z + height;
-							face_z = sin(degree * PI / 180.0f)*j.Y + cos(degree * PI / 180.0f)*j.Z;
-							face_x *= 10.0f;
-							face_y *= 10.0f;
-							face_z *= -10.0f;
-
-							gotFace = TRUE;
-
-						}
+						shapes[nShapes]->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
 					}
+					
+					PxRigidDynamic* newParticleActorJoint = CreateSphere(PxVec3(output[i].x, output[i].y, output[i].z), particleSize, 1.0f);
+					((PxRigidBody*)newParticleActorJoint)->setMass(100);
+					newParticleActorJoint->setActorFlag(PxActorFlag::eDISABLE_GRAVITY,true);
+					
+					setupFiltering(newParticleActorJoint, FilterGroup::ePARTICLE, FilterGroup::ePARTICLE);
+					
+					PxDistanceJoint* joint = PxDistanceJointCreate(*gPhysicsSDK, newParticleActor, PxTransform(PxVec3(0.0, 0.0, 0.0)), newParticleActorJoint, PxTransform(PxVec3(0.0, 0.0, 0.0)));
+					joint->setDamping(100.0);
+					joint->setStiffness(1000.0f);
+					joint->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
+
+					proxyParticle.push_back(newParticle);
+					proxyParticleActor.push_back(newParticleActor);
+					proxyParticleJoint.push_back(newParticleActorJoint);
 				}
 			}
+			else // otherwise updated it
+			{
+				//DBOUT("\n updated");
+				for (int i = 0; i < 48; i++)
+				{
+					output[i].x *= 10.0f;
+					output[i].y *= 10.0f;
+					output[i].z *= 10.0f;
+					proxyParticle[i] = { output[i].x, output[i].y, output[i].z };
+					PxTransform transform_update(PxVec3(output[i].x, output[i].y, output[i].z), PxQuat::createIdentity());
+					((PxRigidDynamic*)proxyParticleActor[i])->setKinematicTarget(transform_update);
+					((PxRigidDynamic*)proxyParticleJoint[i])->setGlobalPose(transform_update);
+				}
+			}
+			
+			//std::free(suggestPosition);
+			//std::free(depthPoints);
+			//std::free(output);
+			//std::free(spacePoint);
+			
+		}
+		else // no hand detected, clear 
+		{
+			if (!proxyParticleActor.empty())
+				for (int i = 0; i < 48; i++)
+				{
+					proxyParticleActor[i]->release();
+					proxyParticleJoint[i]->release();
+				}
 
-			//if (gotFace)
+			proxyParticleJoint.clear();
+			proxyParticle.clear();
+			proxyParticleActor.clear();
+
+			tracker->reset();
+		}
+#endif
+		
+		//if (gotFace)
 			//{
 			//	PointF facePoints[FacePointType::FacePointType_Count];
 			//	pFaceFrameResult->GetFacePointsInColorSpace(FacePointType::FacePointType_Count, facePoints);
@@ -459,7 +557,7 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 			//		}
 			//	}
 
-			
+#ifdef USE_PARTICLE
 
 #pragma region update_particle
 			if (!u.empty() && !v.empty())
@@ -521,10 +619,11 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 								if ((depthX >= 0 && depthX < nDepthWidth) && (depthY >= 0 && depthY < nDepthHeight))
 								{
 									//if the position is valid update the depth of the particle.
-									BYTE player = pBodyIndexBuffer[depthX + (depthY * cDepthWidth)];
+									//BYTE player = pBodyIndexBuffer[depthX + (depthY * cDepthWidth)];
 									UINT16 depth = pDepthBuffer[depthX + depthY*cDepthWidth];
 
-									if (player != 0xff && depth > 500 && depth < 2000)
+									//if (player != 0xff && depth > 500 && depth < 2000)
+									if (depth > 500 && depth < 2000)
 									{
 										CameraSpacePoint camPoint;
 										m_pCoordinateMapper->MapDepthPointToCameraSpace(p, depth, &camPoint);
@@ -612,11 +711,11 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 
 					if ((depthX >= 0 && depthX < nDepthWidth) && (depthY >= 0 && depthY < nDepthHeight))
 					{
-						BYTE player = pBodyIndexBuffer[depthX + (depthY * cDepthWidth)];
+						//BYTE player = pBodyIndexBuffer[depthX + (depthY * cDepthWidth)];
 						UINT16 depth = pDepthBuffer[depthX + depthY*cDepthWidth];
 
 						// if we're tracking a player for the current pixel, draw from the color camera
-						if (player != 0xff)
+						if (depth > 500 && depth < 2000)
 						{
 							// set source for copy to the color pixels
 							pSrc = m_pColorRGBX + colorIndex;
@@ -727,8 +826,7 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 			//proxyParticle.insert(proxyParticle.end(), temporary.begin(), temporary.end());
 			//proxyParticleActor.insert(proxyParticleActor.end(), tempAct.begin(), tempAct.end());
 
-
-			//Clear Overlap particle
+#pragma region ClearOverlapparticle
 			vector<Particle>::iterator it = proxyParticle.begin();
 			vector<PxRigidActor*>::iterator itact = proxyParticleActor.begin();
 			vector<PxRigidActor*>::iterator itjoint = proxyParticleJoint.begin();
@@ -775,7 +873,9 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 				}
 
 			}
-		}
+#pragma endregion
+#endif
+		
 	}
 }
 
@@ -881,7 +981,7 @@ PxRigidDynamic* KinectHandle::CreateSphere(const PxVec3& pos, const PxReal radiu
 	PxTransform transform(pos, PxQuat::createIdentity());
 	PxSphereGeometry geometry(radius);
 
-	PxMaterial* mMaterial = gPhysicsSDK->createMaterial(10000.0, 10000.0, 1.0);
+	PxMaterial* mMaterial = gPhysicsSDK->createMaterial(1.0, 1.0, 1.0);
 
 	PxRigidDynamic* actor = PxCreateDynamic(*gPhysicsSDK, transform, geometry, *mMaterial, density);
 
@@ -1061,190 +1161,8 @@ HRESULT KinectHandle::UpdateBodyData(IBody** ppBodies, IMultiSourceFrame* pMulti
 void KinectHandle::getFaceResult(float* x, float* y , float* z)
 {
 	*x = face_x ;
-	*y = face_y -0.5f;
-	*z = face_z +0.5f;
+	*y = face_y ;
+	*z = face_z ;
 }
-
-
-void KinectHandle::HandEncoding(float* HandParameter, D3DXVECTOR4* output)
-{
-	//D3DXMATRIX index_offset, middle_offset, ring_offset, pinky_offset, thumb_offset;
-	//D3DXMatrixTranslation(&index_offset, -particleRadius*0.25f, particleRadius*1.0f, 0.0f);
-	//D3DXMatrixTranslation(&middle_offset, 0.0f, particleRadius*1.2f, 0.0f);
-	//D3DXMatrixTranslation(&ring_offset, particleRadius*0.25f, particleRadius*1.0f, 0.0f);
-	//D3DXMatrixTranslation(&pinky_offset, particleRadius*0.5f, particleRadius*0.6, 0.0f);
-	D3DXMATRIX index_offset, middle_offset, ring_offset, pinky_offset, thumb_offset;
-	D3DXMatrixTranslation(&index_offset, 0.0f, particleRadius*1.2f, 0.0f);
-	D3DXMatrixTranslation(&middle_offset, 0.0f, particleRadius*1.4f, 0.0f);
-	D3DXMatrixTranslation(&ring_offset, 0.0f, particleRadius*1.2f, 0.0f);
-	D3DXMatrixTranslation(&pinky_offset, 0.0f, particleRadius, 0.0f);
-
-	D3DXMatrixTranslation(&thumb_offset, -particleRadius*0.5, particleRadius*1.2, 0.0f);
-
-	//World Coordinate -Palm
-	D3DXMATRIX global_translate;
-	D3DXMatrixTranslation(&global_translate, HandParameter[0], HandParameter[1], HandParameter[2]);
-
-	D3DXMATRIX global_rotate, global;
-	D3DXQUATERNION global_quaternion;
-	global_quaternion.x = HandParameter[3];
-	global_quaternion.y = HandParameter[4];
-	global_quaternion.z = HandParameter[5];
-	global_quaternion.w = HandParameter[6];
-	D3DXQuaternionNormalize(&global_quaternion, &global_quaternion);
-	D3DXMatrixRotationQuaternion(&global_rotate, &global_quaternion);
-
-	global = global_rotate* global_translate;
-
-	// index_finger
-	D3DXMATRIX index_rotate[3], index_transform[3], index_final[6], index_position;
-
-	D3DXMatrixRotationYawPitchRoll(&index_rotate[0], 0.0f, HandParameter[7], HandParameter[8]);
-	index_transform[0] = index_offset*index_rotate[0];
-
-	D3DXMatrixRotationYawPitchRoll(&index_rotate[1], 0.0f, HandParameter[9], 0.0f);
-	index_transform[1] = index_offset * index_rotate[1];
-
-	D3DXMatrixRotationYawPitchRoll(&index_rotate[2], 0.0f, HandParameter[10], 0.0f);
-	index_transform[2] = index_offset * index_rotate[2];
-
-	D3DXMatrixTranslation(&index_position, -particleRadius * 2.5, particleRadius * 6, 0.0f);
-	index_final[0] = index_transform[0] * (index_position* global);
-	index_final[1] = index_offset * index_final[0];
-	index_final[2] = index_offset * index_final[1];
-	index_final[3] = index_transform[1] * index_final[2];
-	index_final[4] = index_offset * index_final[3];
-	index_final[5] = index_transform[2] * index_final[4];
-
-	// middle_finger
-	D3DXMATRIX middle_rotate[3], middle_transform[3], middle_final[6], middle_position;
-
-	D3DXMatrixRotationYawPitchRoll(&middle_rotate[0], 0.0f, HandParameter[11], HandParameter[12]);
-	middle_transform[0] = middle_offset*middle_rotate[0];
-
-	D3DXMatrixRotationYawPitchRoll(&middle_rotate[1], 0.0f, HandParameter[13], 0.0f);
-	middle_transform[1] = middle_offset * middle_rotate[1];
-
-	D3DXMatrixRotationYawPitchRoll(&middle_rotate[2], 0.0f, HandParameter[14], 0.0f);
-	middle_transform[2] = middle_offset * middle_rotate[2];
-
-	D3DXMatrixTranslation(&middle_position, -particleRadius*0.5, particleRadius * 6, 0.0f);
-	middle_final[0] = middle_transform[0] * (middle_position* global);
-	middle_final[1] = middle_offset * middle_final[0];
-	middle_final[2] = middle_offset * middle_final[1];
-	middle_final[3] = middle_transform[1] * middle_final[2];
-	middle_final[4] = middle_offset * middle_final[3];
-	middle_final[5] = middle_transform[2] * middle_final[4];
-
-	// ring_finger
-	D3DXMATRIX ring_rotate[3], ring_transform[3], ring_final[6], ring_position;
-
-	D3DXMatrixRotationYawPitchRoll(&ring_rotate[0], 0.0f, HandParameter[15], HandParameter[16]);
-	ring_transform[0] = ring_offset*ring_rotate[0];
-
-	D3DXMatrixRotationYawPitchRoll(&ring_rotate[1], 0.0f, HandParameter[17], 0.0f);
-	ring_transform[1] = ring_offset * ring_rotate[1];
-
-	D3DXMatrixRotationYawPitchRoll(&ring_rotate[2], 0.0f, HandParameter[18], 0.00);
-	ring_transform[2] = ring_offset * ring_rotate[2];
-
-	D3DXMatrixTranslation(&ring_position, particleRadius*1.5, particleRadius * 6, 0.0f);
-	ring_final[0] = ring_transform[0] * (ring_position* global);
-	ring_final[1] = ring_offset * ring_final[0];
-	ring_final[2] = ring_offset * ring_final[1];
-	ring_final[3] = ring_transform[1] * ring_final[2];
-	ring_final[4] = ring_offset * ring_final[3];
-	ring_final[5] = ring_transform[2] * ring_final[4];
-
-
-	//Pinky finger
-	D3DXMATRIX pinky_rotate[3], pinky_transform[3], pinky_final[6], pinky_position;
-
-	D3DXMatrixRotationYawPitchRoll(&pinky_rotate[0], 0.0f, HandParameter[19], HandParameter[20]);
-	pinky_transform[0] = pinky_offset*pinky_rotate[0];
-
-	D3DXMatrixRotationYawPitchRoll(&pinky_rotate[1], 0.0f, HandParameter[21], 0.0f);
-	pinky_transform[1] = pinky_offset * pinky_rotate[1];
-
-	D3DXMatrixRotationYawPitchRoll(&pinky_rotate[2], 0.0f, HandParameter[22], 0.0f);
-	pinky_transform[2] = pinky_offset * pinky_rotate[2];
-
-	D3DXMatrixTranslation(&pinky_position, particleRadius*3.5, particleRadius* 5.5, 0.0f);
-	pinky_final[0] = pinky_transform[0] * (pinky_position* global);
-	pinky_final[1] = pinky_offset * pinky_final[0];
-	pinky_final[2] = pinky_offset * pinky_final[1];
-	pinky_final[3] = pinky_transform[1] * pinky_final[2];
-	pinky_final[4] = pinky_offset * pinky_final[3];
-	pinky_final[5] = pinky_transform[2] * pinky_final[4];
-
-
-	//thumb
-	D3DXMATRIX thumb_rotate[3], thumb_transform[3], thumb_final[8], thumb_position;
-
-	D3DXMatrixRotationYawPitchRoll(&thumb_rotate[0], 0.0f, HandParameter[23], HandParameter[24]);
-	thumb_transform[0] = thumb_offset*thumb_rotate[0];
-
-	D3DXMatrixRotationYawPitchRoll(&thumb_rotate[1], 0.0f, HandParameter[25], 0.0f);
-	thumb_transform[1] = thumb_offset * thumb_rotate[1];
-
-	D3DXMatrixRotationYawPitchRoll(&thumb_rotate[2], 0.0f, HandParameter[26], 0.0f);
-	thumb_transform[2] = thumb_offset * thumb_rotate[2];
-
-	D3DXMatrixTranslation(&thumb_position, -particleRadius * 3, -particleRadius * 4.0, particleRadius);
-	thumb_final[0] = thumb_transform[0] * (thumb_position* global);
-	thumb_final[1] = thumb_offset * thumb_final[0];
-	thumb_final[2] = thumb_offset * thumb_final[1];
-	thumb_final[3] = thumb_offset * thumb_final[2];
-	thumb_final[4] = thumb_offset * thumb_final[3];
-	thumb_final[5] = thumb_transform[1] * thumb_final[4];
-	thumb_final[6] = thumb_offset * thumb_final[5];
-	thumb_final[7] = thumb_transform[2] * thumb_final[6];
-
-
-	D3DXVECTOR4 palm[16];
-
-
-	palm[6] = D3DXVECTOR4(particleRadius*2.25f, -particleRadius * 6, 0.0f, 1.0f);
-	palm[7] = D3DXVECTOR4(-particleRadius*2.25f, -particleRadius * 6, 0.0f, 1.0f);
-	palm[10] = D3DXVECTOR4(particleRadius*0.75, -particleRadius * 6, 0.0f, 1.0f);
-	palm[11] = D3DXVECTOR4(-particleRadius*0.75, -particleRadius * 6, 0.0f, 1.0f);
-
-	palm[14] = D3DXVECTOR4(particleRadius * 3, -particleRadius * 2, 0.0f, 1.0f);
-	palm[15] = D3DXVECTOR4(-particleRadius * 3, -particleRadius * 2, 0.0f, 1.0f);
-	palm[2] = D3DXVECTOR4(particleRadius, -particleRadius * 2, 0.0f, 1.0f);
-	palm[3] = D3DXVECTOR4(-particleRadius, -particleRadius * 2, 0.0f, 1.0f);
-
-	palm[12] = D3DXVECTOR4(particleRadius * 3, particleRadius * 2, 0.0f, 1.0f);
-	palm[13] = D3DXVECTOR4(-particleRadius * 3, particleRadius * 2, 0.0f, 1.0f);
-	palm[0] = D3DXVECTOR4(particleRadius, particleRadius * 2, 0.0f, 1.0f);
-	palm[1] = D3DXVECTOR4(-particleRadius, particleRadius * 2, 0.0f, 1.0f);
-
-	palm[4] = D3DXVECTOR4(particleRadius * 3, particleRadius * 6, 0.0f, 1.0f);
-	palm[5] = D3DXVECTOR4(-particleRadius * 3, particleRadius * 6, 0.0f, 1.0f);
-	palm[8] = D3DXVECTOR4(particleRadius, particleRadius * 6, 0.0f, 1.0f);
-	palm[9] = D3DXVECTOR4(-particleRadius, particleRadius * 6, 0.0f, 1.0f);
-
-
-	D3DXVECTOR4 origin = D3DXVECTOR4(0, 0, 0, 1.0);
-
-	for (int i = 0; i < 16; i++)
-		D3DXVec4Transform(&output[i], &palm[i], &global);
-
-	for (int i = 0; i < 6; i++)
-	{
-		D3DXVec4Transform(&output[i + 16], &origin, &index_final[i]);
-		D3DXVec4Transform(&output[i + 22], &origin, &middle_final[i]);
-		D3DXVec4Transform(&output[i + 28], &origin, &ring_final[i]);
-		D3DXVec4Transform(&output[i + 34], &origin, &pinky_final[i]);
-
-	}
-
-	for (int i = 0; i < 8; i++)
-		D3DXVec4Transform(&output[i + 40], &origin, &thumb_final[i]);
-
-}
-
-
-
 
 

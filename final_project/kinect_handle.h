@@ -1,5 +1,9 @@
 
 #include <iostream>
+#include <queue>
+#include <climits>
+#include <omp.h>
+#include <random>
 
 // Kinect Library
 #include <Kinect.h>
@@ -26,6 +30,14 @@
 #include <PxSimpleFactory.h>
 #include <vector>
 #include <PxVisualDebuggerExt.h>
+
+#include "tracker.h"
+
+
+
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3d10.lib")
+#pragma comment(lib, "d3dx10.lib")
 
 #define PI 3.14159265
 
@@ -59,6 +71,8 @@ class KinectHandle
 	static const int		particle_flow_height = 360;
 	static const int		particle_flow_width = 640;
 	static const int		factor = 3;
+	static const int		num_particle_pso = 64;
+	static const int		num_generation_pso = 30;
 
 
 
@@ -115,17 +129,14 @@ public:
 
 	HRESULT	ProcessColor(int nBufferSize);
 	HRESULT KinectProcess();
-
 	
-
-
 	void	RenderParticle();
 	void	UpdateParticle(Mat& u, Mat& v);
 	void    getFlowField(const Mat& u, const Mat& v, Mat& flowField);
 	void    ProcessFrame(INT64 nTime,
-			const UINT16* pDepthBuffer, int nDepthHeight, int nDepthWidth,
-			const RGBQUAD* pColorBuffer, int nColorWidth, int nColorHeight,
-			const BYTE* pBodyIndexBuffer, int nBodyIndexWidth, int nBodyIndexHeight, IBody** ppBodies, int nBodyCount, Mat& u, Mat& v);
+			UINT16* pDepthBuffer, int nDepthHeight, int nDepthWidth,
+			RGBQUAD* pColorBuffer, int nColorWidth, int nColorHeight,
+			 Mat& u, Mat& v, USHORT nMinDistance, USHORT nMaxDistance);
 
 	void	CloseKinect();
 	void	CloseOpenCV();
@@ -141,6 +152,8 @@ public:
 	PxRigidDynamic* CreateSphere(const PxVec3& pos, const PxReal radius, const PxReal density);
 
 private:
+
+	float*                              handParameter;
 	LONG                                m_depthWidth;
 	LONG                                m_depthHeight;
 
@@ -153,11 +166,9 @@ private:
 	float								face_y;
 	float								face_z;
 
+	Tracker* tracker;
+
 	void setupFiltering(PxRigidActor* actor, PxU32 filterGroup, PxU32 filterMask);
-
-
-	void HandEncoding(float* HandParameter, D3DXVECTOR4* output);
-
 
 };
 

@@ -8,6 +8,7 @@ cbuffer cbPerObject
 {
 	float4x4 gWVP; 
 	float cameraDepth;
+	float4 gColor;
 };
 
 void VS(float3 iPosL  : POSITION,
@@ -25,7 +26,7 @@ void VS(float3 iPosL  : POSITION,
 float4 PS(float4 posH  : SV_POSITION,
           float4 color : COLOR) : SV_Target
 {
-    return float4(0.0f,1.0f,0.0f,0.5f);
+    return gColor;
 }
 
 technique10 ColorTech

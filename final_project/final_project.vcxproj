@@ -55,6 +55,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -84,6 +85,8 @@
     <ClInclude Include="d3dUtil.h" />
     <ClInclude Include="graphic.h" />
     <ClInclude Include="final_project.h" />
+    <ClInclude Include="helper.h" />
+    <ClInclude Include="hungarian.h" />
     <ClInclude Include="kinect_handle.h" />
     <ClInclude Include="lightclass.h" />
     <ClInclude Include="lightshaderclass.h" />
@@ -95,10 +98,13 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="terrainclass.h" />
     <ClInclude Include="textureclass.h" />
+    <ClInclude Include="tracker.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="graphic.cpp" />
     <ClCompile Include="final_project.cpp" />
+    <ClCompile Include="helper.cpp" />
+    <ClCompile Include="hungarian.cpp" />
     <ClCompile Include="kinect_handle.cpp" />
     <ClCompile Include="lightclass.cpp" />
     <ClCompile Include="lightshaderclass.cpp" />
@@ -111,6 +117,7 @@
     </ClCompile>
     <ClCompile Include="terrainclass.cpp" />
     <ClCompile Include="textureclass.cpp" />
+    <ClCompile Include="tracker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="final_project.rc" />

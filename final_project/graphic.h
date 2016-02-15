@@ -88,6 +88,7 @@ private:
 	ID3D10EffectTechnique*      mTech_Sphere;
 	ID3D10EffectMatrixVariable* mfxWVPVar_Sphere;
 	ID3D10EffectScalarVariable* mfxCameraDistance_Sphere;
+	ID3D10EffectVectorVariable* mfxColor_Sphere;
 
 	ID3D10InputLayout*          mVertexLayout;
 
@@ -120,6 +121,9 @@ private:
 	LightClass* m_Light;
 
 	ID3DX10Mesh* sphere;
+	long long start_time = 0;
+	long long oldTimeSinceStart = 0;
+	float mAccumulator = 0;
 
 
 	void       buildFX();
@@ -129,13 +133,15 @@ private:
 	void       StepPhysX();
 	D3DXMATRIX PxtoXMMatrix(PxTransform input);
 	void       DrawBox(PxShape* pShape, PxRigidActor* actor);
-	void	   DrawSphere(PxShape* pShape, PxRigidActor* actor);
+	void	   DrawSphere(PxRigidActor* actor, int index);
 	void       DrawShape(PxShape* shape, PxRigidActor* actor);
 	void       DrawActor(PxRigidActor* actor);
 	void       RenderActors(bool);
 	bool       CreateDevice(HWND);
 	void       FreeDevice();
 	
+
+	long long milliseconds_now();
 
 
 

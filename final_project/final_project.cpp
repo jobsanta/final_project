@@ -63,8 +63,8 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	}
 
 	// Full Screen commented this
-	ShowWindow(hWnd, nCmdShow);
-	UpdateWindow(hWnd);
+	//ShowWindow(hWnd, nCmdShow);
+	//UpdateWindow(hWnd);
 
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_FINAL_PROJECT));
 
@@ -113,7 +113,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			HRESULT hr = kinect_handle.KinectProcess();
 			vector<PxRigidActor*> proxyParticleActor = kinect_handle.getProxyParticle();
 			kinect_handle.getFaceResult(&x, &y, &z);
-			
+		
 			currentX = smooth_x.update(x);
 			currentY = smooth_y.update(y);
 			currentZ = smooth_z.update(z);
