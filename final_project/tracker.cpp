@@ -1,18 +1,27 @@
 #include "stdafx.h"
 #include "tracker.h"
+#include <sstream>
 //#inlcude "helper.h"
 
 #define INF INT_MAX
 
 
+#define DBOUT( s )            \
+{                             \
+   std::wostringstream os_;    \
+   os_ << s;                   \
+   OutputDebugStringW( os_.str().c_str() );  \
+}
+
 static const float particleSize = 0.2f;
 static const float particleRadius = 0.01f;
 
-static const float height = 1.15;
-static const float degree = 65.0f;
+static const float height = 0.9f;
+static const float degree = 40.0;
 static const float interact_limit_y = 5.0f; // in 10 CM
 static const float interact_limit_y2 = 0.1f; // in 10 CM
 static const float interact_limit_Z = -5.0f;
+
 
 static const int        cDepthWidth = 512;
 static const int        cDepthHeight = 424;
@@ -24,6 +33,11 @@ Tracker::Tracker()
 	trackParameter = new float[27];
 	firstRun = true;
 	frame = 0;
+
+	cos_deg = cos(degree*PI / 180.0f);
+	sin_deg = sin(degree*PI / 180.0f);
+	tan_deg = tan(degree*PI / 180.0f);
+
 	for (int i = 0; i < 27; i++)
 	{
 		trackParameter[i] = 0;
@@ -128,21 +142,21 @@ D3DXVECTOR4* Tracker::handTrack()
 	//Add Wrist Detection here
 
 
-	Mat img_blackwhite_inv, dist, img_blackwhite ;
-	threshold(depthMap8UC, img_blackwhite_inv, 100, 255, CV_THRESH_BINARY_INV | CV_THRESH_OTSU);
+	Mat img_blackwhite_inv, dist, img_blackwhite, color;
+	cv::threshold(depthMap8UC, img_blackwhite_inv, 100, 255, CV_THRESH_BINARY_INV | CV_THRESH_OTSU);
 	distanceTransform(img_blackwhite_inv, dist, CV_DIST_L2, 3);
-	threshold(depthMap8UC(Rect(rh_d.x - 75, rh_d.y - 75, 150, 150)), img_blackwhite, 100, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
+	cv::threshold(depthMap8UC(Rect(rh_d.x - 75, rh_d.y - 75, 150, 150)), img_blackwhite, 100, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
+	cv::cvtColor(depthMap8UC, color, CV_GRAY2BGR);
 
-	//Clear Previous value
-	if (frame % 10 == 0)
-	{
-
-
+	detectedPalm = false;
+	if (frame % 1 == 0)
+	{	//Clear Previous value
 		for (int i = 0; i < 6; i++)
 		{
 			valid_finger[i] = false;
 			detected_finger[i] = false;
 		}
+
 		fingerDirection.clear();
 		fingerTipPosition.clear();
 		fingertip_list.clear();
@@ -155,21 +169,24 @@ D3DXVECTOR4* Tracker::handTrack()
 		findXYFingerSegment(extremePoints, img_blackwhite, hand_depth, rh_d);
 		Mat img_hand = depthMap(Rect(rh_d.x - 75, rh_d.y - 75, 150, 150));
 		findZFingerSegment(img_hand, rh_d);
-		//imshow("xyfinger", xyFingerSegmented);
 
-		pcaPalm(img_hand, rh_d);// need to return palm orientation
+		for (int i = 0; i < extremePoints.size(); i++)
+			circle(xyFingerSegmented, extremePoints[i], 3, Scalar(128));
+		imshow("xyfinger", xyFingerSegmented);
+
+		pcaPalm(img_hand, rh_d, color);// need to return palm orientation
 
 
-		pcaFinger(rh_d); // need to return
+		pcaFinger(rh_d,color); // need to return
 		predictFinger();
 	}
 	frame++;
-	bool useSuggestion = detectedPalm & (detected_finger[0] | detected_finger[1] | detected_finger[2] | detected_finger[3] | detected_finger[4] | detected_finger[5]);
+	bool useSuggestion = detectedPalm && (detected_finger[0] || detected_finger[1] || detected_finger[2] || detected_finger[3] || detected_finger[4] || detected_finger[5]);
 	if (firstRun)
 	{
 		if (useSuggestion)
 		{
-			std::copy(&suggestParameter[0], &suggestParameter[27], trackParameter);
+			std::copy(&suggestParameter[0], &suggestParameter[26], trackParameter);
 			firstRun = false;
 		}
 	}
@@ -197,48 +214,91 @@ D3DXVECTOR4* Tracker::handTrack()
 		m_pCoordinateMapper->MapDepthPointsToCameraSpace(256, random_surface, 256, depth, 256, camera_surface);
 
 
-		suggestParameter[9] = 0;
-		suggestParameter[10] = 0;
-		suggestParameter[11] = PI / 2;
-		suggestParameter[12] = 0;
-		suggestParameter[13] = PI / 2;
-		suggestParameter[14] = PI / 2;
-		suggestParameter[15] = PI / 2;
-		suggestParameter[16] = 0;
-		suggestParameter[17] = PI / 2;
-		suggestParameter[18] = PI / 2;
-		suggestParameter[19] = PI / 2;
-		suggestParameter[20] = 0;
-		suggestParameter[21] = PI / 2;
-		suggestParameter[22] = PI / 2;
-		suggestParameter[23] = PI / 2;
-		suggestParameter[24] = 0;
-		suggestParameter[25] = PI / 2;
-		suggestParameter[26] = PI / 2;
+		//suggestParameter[9] = 0;
+		//suggestParameter[10] = 0;
+		//suggestParameter[11] = PI / 2;
+		//suggestParameter[12] = 0;
+		//suggestParameter[13] = PI / 2;
+		//suggestParameter[14] = PI / 2;
+		//suggestParameter[15] = PI / 2;
+		//suggestParameter[16] = 0;
+		//suggestParameter[17] = PI / 2;
+		//suggestParameter[18] = PI / 2;
+		//suggestParameter[19] = PI / 2;
+		//suggestParameter[20] = 0;
+		//suggestParameter[21] = PI / 2;
+		//suggestParameter[22] = PI / 2;
+		//suggestParameter[23] = PI / 2;
+		//suggestParameter[24] = 0;
+		//suggestParameter[25] = PI / 2;
+		//suggestParameter[26] = PI / 2;
 
-		trackParameter[9] = 0;
-		trackParameter[10] = 0;
-		trackParameter[11] = PI / 2;
-		trackParameter[12] = 0;
-		trackParameter[13] = PI / 2;
-		trackParameter[14] = PI / 2;
-		trackParameter[15] = PI / 2;
-		trackParameter[16] = 0;
-		trackParameter[17] = PI / 2;
-		trackParameter[18] = PI / 2;
-		trackParameter[19] = PI / 2;
-		trackParameter[20] = 0;
-		trackParameter[21] = PI / 2;
-		trackParameter[22] = PI / 2;
-		trackParameter[23] = PI / 2;
-		trackParameter[24] = 0;
-		trackParameter[25] = PI / 2;
-		trackParameter[26] = PI / 2;
-
+		//trackParameter[9] = 0;
+		//trackParameter[10] = 0;
+		//trackParameter[11] = PI / 2;
+		//trackParameter[12] = 0;
+		//trackParameter[13] = PI / 2;
+		//trackParameter[14] = PI / 2;
+		//trackParameter[15] = PI / 2;
+		//trackParameter[16] = 0;
+		//trackParameter[17] = PI / 2;
+		//trackParameter[18] = PI / 2;
+		//trackParameter[19] = PI / 2;
+		//trackParameter[20] = 0;
+		//trackParameter[21] = PI / 2;
+		//trackParameter[22] = PI / 2;
+		//trackParameter[23] = PI / 2;
+		//trackParameter[24] = 0;
+		//trackParameter[25] = PI / 2;
+		//trackParameter[26] = PI / 2;
+		//if(useSuggestion)
+		//DBOUT("\n detectePalm");
+	
 
 		trackParameter = optimized(trackParameter, suggestParameter, rh_d, depthMap, dist, camera_surface, useSuggestion);
 
 		handEncoding(trackParameter, output);
+
+		CameraSpacePoint* spacePoint = new CameraSpacePoint[48];
+		DepthSpacePoint* depthPoints = new DepthSpacePoint[48];
+		for (int i = 0; i < 16; i++)
+		{
+			worldtoCameraSpace(spacePoint[i], output[i].x, output[i].y, output[i].z);
+			m_pCoordinateMapper->MapCameraPointToDepthSpace(spacePoint[i], &depthPoints[i]);
+			circle(color, cv::Point(depthPoints[i].X, depthPoints[i].Y), 1, cv::Scalar(255, 255, 255), -1);
+		}
+		for (int i = 16; i < 22; i++)
+		{
+			worldtoCameraSpace(spacePoint[i], output[i].x, output[i].y, output[i].z);
+			m_pCoordinateMapper->MapCameraPointToDepthSpace(spacePoint[i], &depthPoints[i]);
+			circle(color, cv::Point(depthPoints[i].X, depthPoints[i].Y), 1, cv::Scalar(255, 0, 255), -1);
+		}
+		for (int i = 22; i < 28; i++)
+		{
+			worldtoCameraSpace(spacePoint[i], output[i].x, output[i].y, output[i].z);
+			m_pCoordinateMapper->MapCameraPointToDepthSpace(spacePoint[i], &depthPoints[i]);
+			circle(color, cv::Point(depthPoints[i].X, depthPoints[i].Y), 1, cv::Scalar(255, 0, 0), -1);
+		}
+		for (int i = 28; i < 34; i++)
+		{
+			worldtoCameraSpace(spacePoint[i], output[i].x, output[i].y, output[i].z);
+			m_pCoordinateMapper->MapCameraPointToDepthSpace(spacePoint[i], &depthPoints[i]);
+			circle(color, cv::Point(depthPoints[i].X, depthPoints[i].Y), 1, cv::Scalar(0, 255, 0), -1);
+		}
+		for (int i = 34; i < 40; i++)
+		{
+			worldtoCameraSpace(spacePoint[i], output[i].x, output[i].y, output[i].z);
+			m_pCoordinateMapper->MapCameraPointToDepthSpace(spacePoint[i], &depthPoints[i]);
+			circle(color, cv::Point(depthPoints[i].X, depthPoints[i].Y), 1, cv::Scalar(255, 255, 0), -1);
+		}
+		for (int i = 40; i < 48; i++)
+		{
+			worldtoCameraSpace(spacePoint[i], output[i].x, output[i].y, output[i].z);
+			m_pCoordinateMapper->MapCameraPointToDepthSpace(spacePoint[i], &depthPoints[i]);
+			circle(color, cv::Point(depthPoints[i].X, depthPoints[i].Y), 1, cv::Scalar(0, 255, 255), -1);
+		}
+
+		imshow("Debug Img", color);
 	}
 
 
@@ -281,75 +341,112 @@ void Tracker::wristDetection()
 		Size(2 * dilateSize + 1, 2 * dilateSize + 1),
 		Point(dilateSize, dilateSize));
 	dilate(img_WristMask, img_WristMask, element);
+
+	imshow("wrist mask", img_WristMask);
 }
 
-bool Tracker::headTrack(Point3d &p3d)
+bool Tracker::headTrack(Point3f &p3d)
 {
 	bool detectedHead = false;
 	Mat depthMap(nDepthHeight, nDepthWidth, CV_16UC1, reinterpret_cast<void*>(pDepthBuffer));
 	Mat head_depth = depthMap.clone();
-
+	float topValue = 0;
+	float position_x = 9999; 
+	float position_y = 9999;
+	float position_z = 9999;
 	for (int j = 0; j < nDepthHeight; j++)
 	{
 		ushort* p = head_depth.ptr<ushort>(j);
 		for (int i = 0; i < nDepthWidth; i++)
 		{
 			// convert from camera space - > world space
-			float x = depthToCamera_points[j*nDepthWidth + i].X;
-			float y = 0.4226*depthToCamera_points[j*nDepthWidth + i].Y - 0.9063*depthToCamera_points[j*nDepthWidth + i].Z + height;
-			float z = -0.9063*depthToCamera_points[j*nDepthWidth + i].Y - 0.4226*depthToCamera_points[j*nDepthWidth + i].Z;
+			float x, y, z;
+			cameraToWorldSpace(depthToCamera_points[j*nDepthWidth + i], &x, &y, &z);
 			//TODO Make it work with different setup
-			if (y < 0.0 || z > -0.5)
+			if (y < 0.0 || z > -0.9 || z < -1.2f)
 			{
 				p[i] = 0;
 			}
-		}
-	}
-	Mat head_img(nDepthHeight, nDepthWidth, CV_8UC1);
-	head_depth.convertTo(head_img, CV_8UC1, 255.0 / (nMaxDistance - nMinDistance));
-
-	double threshold = 50;
-	double max_area = 0;
-	int max_id;
-	vector<vector<Point>> contours;
-	vector<Vec4i> hierarchy;
-	vector<int> small_blobs;
-	double contour_area;
-	Mat temp_img;
-	head_img.copyTo(temp_img);
-
-	findContours(temp_img, contours, hierarchy, CV_RETR_CCOMP,
-		CV_CHAIN_APPROX_SIMPLE);
-
-	// Find indices of contours whose area is less than `threshold`
-	if (!contours.empty()) {
-		for (size_t i = 0; i < contours.size(); ++i) {
-			contour_area = contourArea(contours[i]);
-			if (contour_area < threshold)
-				small_blobs.push_back(i);
-
-			if (contour_area > max_area)
+			else
 			{
-				max_area = contour_area;
-				max_id = i;
+				if (y > topValue && !isinf(y))
+				{
+					position_x = x;
+					position_y = y;
+					position_z = z;
+					topValue = y;
+				}
 			}
 		}
 	}
 
-	if (max_area > threshold)
+	if (position_y > 0 && position_y < 2.0 && position_z > -1.2f && position_z < -0.9)
 	{
 		detectedHead = true;
-		Moments mu = moments(contours[max_id], false);
-		Point2f mc = Point2f(mu.m10 / mu.m00, mu.m01 / mu.m00);
-		int index = (int)mc.y*nDepthWidth + mc.x;
-		circle(head_img, mc, 3, Scalar(255), 1);
+		p3d.x = position_x;
+		p3d.y = position_y - 0.5;
+		p3d.z = position_z;
 
-		p3d.x =  depthToCamera_points[index].X;
-		p3d.y =  0.4226*depthToCamera_points[index].Y - 0.9063*depthToCamera_points[index].Z + height;
-		p3d.z = -0.9063*depthToCamera_points[index].Y - 0.4226*depthToCamera_points[index].Z;
+		CameraSpacePoint cam_headPosition;
+		DepthSpacePoint depth_headPosition;
+		worldtoCameraSpace(cam_headPosition, position_x, position_y - 0.15, position_z);
+		m_pCoordinateMapper->MapCameraPointToDepthSpace(cam_headPosition, &depth_headPosition);
+
+
+		Mat head_img(nDepthHeight, nDepthWidth, CV_8UC1);
+		head_depth.convertTo(head_img, CV_8UC1, 255.0 / (nMaxDistance - nMinDistance));
+
+		circle(head_img, Point(depth_headPosition.X, depth_headPosition.Y), 2, Scalar(255));
+		imshow("head img", head_img);
+
 	}
 
-	//imshow("head img", head_img);
+
+
+	//float threshold = 50;
+	//float max_area = 0;
+	//int max_id;
+	//vector<vector<Point>> contours;
+	//vector<Vec4i> hierarchy;
+	//vector<int> small_blobs;
+	//float contour_area;
+	//Mat temp_img;
+	//head_img.copyTo(temp_img);
+
+	//cv::findContours(temp_img, contours, hierarchy, CV_RETR_CCOMP,
+	//	CV_CHAIN_APPROX_SIMPLE);
+
+	//// Find indices of contours whose area is less than `threshold`
+	//if (!contours.empty()) {
+	//	for (size_t i = 0; i < contours.size(); ++i) {
+	//		contour_area = contourArea(contours[i]);
+	//		if (contour_area < threshold)
+	//			small_blobs.push_back(i);
+
+	//		if (contour_area > max_area)
+	//		{
+	//			max_area = contour_area;
+	//			max_id = i;
+	//		}
+	//	}
+	//}
+
+
+	//if (max_area > threshold)
+	//{
+	//	detectedHead = true;
+	//	Moments mu = moments(contours[max_id], false);
+	//	Point2f mc = Point2f(mu.m10 / mu.m00, mu.m01 / mu.m00);
+	//	//vector<vector<Point> > contours_poly(1);
+	//	//approxPolyDP(Mat(contours[max_id]), contours_poly[0], 3, true);
+	//	//Rect rec = boundingRect(contours_poly[0]);
+	//	//int x = rec.x + rec.width / 2;
+	//	//int y = rec.y;
+	//	int index = (int)mc.y*nDepthWidth + mc.x;
+	//	circle(head_img, mc, 3, Scalar(255), 1);
+	//	cameraToWorldSpace(depthToCamera_points[index], &p3d.x, &p3d.y, &p3d.z);
+	//}
+
 
 	return detectedHead;
 
@@ -378,12 +475,11 @@ void Tracker::filterInteractiveArea()
 		for (int i = 0; i < nDepthWidth; i++)
 		{
 			// convert from camera space - > world space
-			float x = depthToCamera_points[j*nDepthWidth + i].X;
-			float y = 0.4226*depthToCamera_points[j*nDepthWidth + i].Y - 0.9063*depthToCamera_points[j*nDepthWidth + i].Z + height;
-			float z = -0.9063*depthToCamera_points[j*nDepthWidth + i].Y - 0.4226*depthToCamera_points[j*nDepthWidth + i].Z;
+			float x, y, z;
+			cameraToWorldSpace(depthToCamera_points[j*nDepthWidth + i], &x, &y, &z);
 
 			//TODO Make it work with different setup
-			if (x < -0.3 || x > 0.3 || y < 0.0 || y > 0.5 || z < -0.5 || z > 0.01)
+			if (x < -0.3 || x > 0.3 || y < 0.0 || y > 0.5 || z < -0.65 || z > 0.01)
 			{
 				p[i] = 0;
 			}
@@ -400,13 +496,13 @@ void Tracker::filterInteractiveArea()
 
 	depthMap.convertTo(depthMap8UC, CV_8UC1, 255.0 / (nMaxDistance - nMinDistance));
 
-	double threshold = 50;
-	double max_area = 0;
+	float threshold = 50;
+	float max_area = 0;
 	int max_id = -1;
 	vector<vector<Point>> contours;
 	vector<Vec4i> hierarchy;
 	vector<int> small_blobs;
-	double contour_area;
+	float contour_area;
 	Mat temp_img;
 	depthMap8UC.copyTo(temp_img);
 
@@ -452,7 +548,8 @@ void Tracker::filterInteractiveArea()
 			detectedHandRight = true;
 
 			int centerHand_index = (int)mc.y * nDepthWidth + mc.x;
-			float center_y = 0.4226*depthToCamera_points[centerHand_index].Y - 0.9063*depthToCamera_points[centerHand_index].Z + height;
+			float center_y,center_x, center_z;
+			cameraToWorldSpace(depthToCamera_points[centerHand_index], &center_x, &center_y, &center_z);
 
 
 			for (int j = mc.y - 75; j < mc.y + 75; j++)
@@ -462,8 +559,8 @@ void Tracker::filterInteractiveArea()
 				for (int i = mc.x - 75; i < mc.x + 75; i++)
 				{
 					// convert from camera space - > world space
-					float y = 0.4226*depthToCamera_points[j*nDepthWidth + i].Y - 0.9063*depthToCamera_points[j*nDepthWidth + i].Z + height;
-
+					float y, x, z;
+					cameraToWorldSpace(depthToCamera_points[j*nDepthWidth + i], &x, &y, &z);
 					//TODO Make it work with different setup
 					if (center_y - 0.08 > y)
 					{
@@ -658,8 +755,8 @@ bool Tracker::breadfirst(cv::Point root, uchar color, const Mat& img, Mat& out, 
 	float convert_pixel_to_mm = handCenter_depth*0.708 / 256.0f;
 	cv::Point next;
 
-	double length_limit = 8 * convert_pixel_to_mm;
-	double width_limit = 4 * convert_pixel_to_mm;
+	float length_limit = 8 * convert_pixel_to_mm;
+	float width_limit = 4 * convert_pixel_to_mm;
 	int length = 0;
 	int width = 0;
 
@@ -806,15 +903,15 @@ void Tracker::floodfill4(int x, int y, int center_x, int center_y, uchar oldColo
 	}
 }
 
-void Tracker::pcaPalm(Mat img_depthHand, Point2f rh_d)
+void Tracker::pcaPalm(Mat img_depthHand, Point2f rh_d, Mat color)
 {
-	globalTranslate = Mat::eye(4, 4, CV_64F);
-	globalRotate = Mat::eye(4, 4, CV_64F);
-	globalRotateReverse = Mat::eye(4, 4, CV_64F);
+	globalTranslate = Mat::eye(4, 4, CV_32F);
+	globalRotate = Mat::eye(4, 4, CV_32F);
+	globalRotateReverse = Mat::eye(4, 4, CV_32F);
 	detectedPalm = false;
 
 	//filter out only palm
-	vector<Point3d> pts;
+	vector<Point3f> pts;
 	for (int j = rh_d.y - 75, m = 0; j < rh_d.y + 75, m < 150; j++, m++)
 	{
 		for (int i = rh_d.x - 75, n = 0; j < rh_d.x + 75, n < 150; i++, n++)
@@ -826,10 +923,10 @@ void Tracker::pcaPalm(Mat img_depthHand, Point2f rh_d)
 				CameraSpacePoint p = depthToCamera_points[index];
 				if (p.X != -std::numeric_limits<float>::infinity() && p.Y != -std::numeric_limits<float>::infinity())
 				{
-					double x = depthToCamera_points[index].X;
-					double y = 0.4226*p.Y - 0.9063*p.Z + height;
-					double z = -0.9063*p.Y - 0.4226*p.Z;
-					pts.push_back(Point3d(x, y, z));
+					float x, y, z;
+
+					cameraToWorldSpace(p, &x, &y, &z);
+					pts.push_back(Point3f(x, y, z));
 				}
 			}
 		}
@@ -838,17 +935,17 @@ void Tracker::pcaPalm(Mat img_depthHand, Point2f rh_d)
 	int sz = static_cast<int>(pts.size());
 	if (sz > 0)
 	{
-		Mat data_pts = Mat(sz, 3, CV_64FC1);
+		Mat data_pts = Mat(sz, 3, CV_32FC1);
 		for (int i = 0; i < data_pts.rows; ++i)
 		{
-			data_pts.at<double>(i, 0) = pts[i].x;
-			data_pts.at<double>(i, 1) = pts[i].y;
-			data_pts.at<double>(i, 2) = pts[i].z;
+			data_pts.at<float>(i, 0) = pts[i].x;
+			data_pts.at<float>(i, 1) = pts[i].y;
+			data_pts.at<float>(i, 2) = pts[i].z;
 		}
 		PCA pca_analysis(data_pts, Mat(), CV_PCA_DATA_AS_ROW);
 
-		Point3d cntr = Point3d(pca_analysis.mean.at<double>(0, 0),
-			pca_analysis.mean.at<double>(0, 1), pca_analysis.mean.at<double>(0, 2));
+		Point3d cntr = Point3d(pca_analysis.mean.at<float>(0, 0),
+			pca_analysis.mean.at<float>(0, 1), pca_analysis.mean.at<float>(0, 2));
 
 		palmCenter = cntr;
 
@@ -858,101 +955,98 @@ void Tracker::pcaPalm(Mat img_depthHand, Point2f rh_d)
 
 		int eigen_vector_size = pca_analysis.eigenvectors.rows;
 		//Store the eigenvalues and eigenvectors
-		vector<Point3d> eigen_vecs(eigen_vector_size);
-		vector<double> eigen_val(eigen_vector_size);
+		vector<Point3d> eigen_vecs(3);
+		vector<float> eigen_val(3);
 
 		if (eigen_vector_size >= 2)
 		{
 			//normalize vector
-			double norm[2];
-			norm[0] = sqrt(pca_analysis.eigenvectors.at<double>(0, 0)* pca_analysis.eigenvectors.at<double>(0, 0) +
-				pca_analysis.eigenvectors.at<double>(0, 1) * pca_analysis.eigenvectors.at<double>(0, 1) +
-				pca_analysis.eigenvectors.at<double>(0, 2) * pca_analysis.eigenvectors.at<double>(0, 2));
+			float norm[2];
+			norm[0] = sqrt(pca_analysis.eigenvectors.at<float>(0, 0)* pca_analysis.eigenvectors.at<float>(0, 0) +
+				pca_analysis.eigenvectors.at<float>(0, 1) * pca_analysis.eigenvectors.at<float>(0, 1) +
+				pca_analysis.eigenvectors.at<float>(0, 2) * pca_analysis.eigenvectors.at<float>(0, 2));
 
-			norm[1] = sqrt(pca_analysis.eigenvectors.at<double>(1, 0)* pca_analysis.eigenvectors.at<double>(1, 0) +
-				pca_analysis.eigenvectors.at<double>(1, 1) * pca_analysis.eigenvectors.at<double>(1, 1) +
-				pca_analysis.eigenvectors.at<double>(1, 2) * pca_analysis.eigenvectors.at<double>(1, 2));
+			norm[1] = sqrt(pca_analysis.eigenvectors.at<float>(1, 0)* pca_analysis.eigenvectors.at<float>(1, 0) +
+				pca_analysis.eigenvectors.at<float>(1, 1) * pca_analysis.eigenvectors.at<float>(1, 1) +
+				pca_analysis.eigenvectors.at<float>(1, 2) * pca_analysis.eigenvectors.at<float>(1, 2));
 
 			for (int i = 0; i < eigen_vector_size; i++)
 			{
-				eigen_vecs[i] = Point3d(pca_analysis.eigenvectors.at<double>(i, 0) / norm[i],
-					pca_analysis.eigenvectors.at<double>(i, 1) / norm[i], pca_analysis.eigenvectors.at<double>(i, 2) / norm[i]);
-				eigen_val[i] = pca_analysis.eigenvalues.at<double>(i, 0);
+				eigen_vecs[i] = Point3d(pca_analysis.eigenvectors.at<float>(i, 0) / norm[i],
+					pca_analysis.eigenvectors.at<float>(i, 1) / norm[i], pca_analysis.eigenvectors.at<float>(i, 2) / norm[i]);
+				eigen_val[i] = pca_analysis.eigenvalues.at<float>(i, 0);
 			}
 
 			palmFaceVector = eigen_vecs[1].cross(eigen_vecs[0]);
 
-			globalRotate.at<double>(0, 0) = eigen_vecs[1].x;
-			globalRotate.at<double>(0, 1) = eigen_vecs[1].y;
-			globalRotate.at<double>(0, 2) = eigen_vecs[1].z;
-			globalRotate.at<double>(0, 3) = 0;
+			globalRotate.at<float>(0, 0) = eigen_vecs[1].x;
+			globalRotate.at<float>(0, 1) = eigen_vecs[1].y;
+			globalRotate.at<float>(0, 2) = eigen_vecs[1].z;
+			globalRotate.at<float>(0, 3) = 0;
 
-			globalRotate.at<double>(1, 0) = eigen_vecs[0].x;
-			globalRotate.at<double>(1, 1) = eigen_vecs[0].y;
-			globalRotate.at<double>(1, 2) = eigen_vecs[0].z;
-			globalRotate.at<double>(1, 3) = 0;
+			globalRotate.at<float>(1, 0) = eigen_vecs[0].x;
+			globalRotate.at<float>(1, 1) = eigen_vecs[0].y;
+			globalRotate.at<float>(1, 2) = eigen_vecs[0].z;
+			globalRotate.at<float>(1, 3) = 0;
 
-			globalRotate.at<double>(2, 0) = palmFaceVector.x;
-			globalRotate.at<double>(2, 1) = palmFaceVector.y;
-			globalRotate.at<double>(2, 2) = palmFaceVector.z;
-			globalRotate.at<double>(2, 3) = 0;
+			globalRotate.at<float>(2, 0) = palmFaceVector.x;
+			globalRotate.at<float>(2, 1) = palmFaceVector.y;
+			globalRotate.at<float>(2, 2) = palmFaceVector.z;
+			globalRotate.at<float>(2, 3) = 0;
 
 			globalRotate = globalRotate.inv();
 
-			globalRotateReverse.at<double>(0, 0) = -eigen_vecs[1].x;
-			globalRotateReverse.at<double>(0, 1) = -eigen_vecs[1].y;
-			globalRotateReverse.at<double>(0, 2) = -eigen_vecs[1].z;
-			globalRotateReverse.at<double>(0, 3) = 0;
+			globalRotateReverse.at<float>(0, 0) = -eigen_vecs[1].x;
+			globalRotateReverse.at<float>(0, 1) = -eigen_vecs[1].y;
+			globalRotateReverse.at<float>(0, 2) = -eigen_vecs[1].z;
+			globalRotateReverse.at<float>(0, 3) = 0;
 
-			globalRotateReverse.at<double>(1, 0) = eigen_vecs[0].x;
-			globalRotateReverse.at<double>(1, 1) = eigen_vecs[0].y;
-			globalRotateReverse.at<double>(1, 2) = eigen_vecs[0].z;
-			globalRotateReverse.at<double>(1, 3) = 0;
+			globalRotateReverse.at<float>(1, 0) = eigen_vecs[0].x;
+			globalRotateReverse.at<float>(1, 1) = eigen_vecs[0].y;
+			globalRotateReverse.at<float>(1, 2) = eigen_vecs[0].z;
+			globalRotateReverse.at<float>(1, 3) = 0;
 
-			globalRotateReverse.at<double>(2, 0) = -palmFaceVector.x;
-			globalRotateReverse.at<double>(2, 1) = -palmFaceVector.y;
-			globalRotateReverse.at<double>(2, 2) = -palmFaceVector.z;
-			globalRotateReverse.at<double>(2, 3) = 0;
+			globalRotateReverse.at<float>(2, 0) = -palmFaceVector.x;
+			globalRotateReverse.at<float>(2, 1) = -palmFaceVector.y;
+			globalRotateReverse.at<float>(2, 2) = -palmFaceVector.z;
+			globalRotateReverse.at<float>(2, 3) = 0;
 
 			globalRotateReverse = globalRotateReverse.inv();
 
 			detectedPalm = true;
 
-			globalTranslate.at<double>(0, 3) = cntr.x;
-			globalTranslate.at<double>(1, 3) = cntr.y;
-			globalTranslate.at<double>(2, 3) = cntr.z;
+			globalTranslate.at<float>(0, 3) = cntr.x;
+			globalTranslate.at<float>(1, 3) = cntr.y;
+			globalTranslate.at<float>(2, 3) = cntr.z;
 
-			//CameraSpacePoint cntr_cam;
-			//DepthSpacePoint cntr_depth;
+			CameraSpacePoint cntr_cam;
+			DepthSpacePoint cntr_depth;
 
-			//cntr_cam.X = cntr.x;
-			//cntr_cam.Y = 0.4226*(cntr.y - height) - 0.9063*cntr.z;
-			//cntr_cam.Z = -0.9063*(cntr.y - height) - 0.4226*cntr.z;
-			//m_pCoordinateMapper->MapCameraPointToDepthSpace(cntr_cam, &cntr_depth);
-			//circle(color, cv::Point(cntr_depth.X, cntr_depth.Y), 5, cv::Scalar(255, 0, 255), -1);
+			worldtoCameraSpace(cntr_cam, cntr.x, cntr.y, cntr.z);
+			m_pCoordinateMapper->MapCameraPointToDepthSpace(cntr_cam, &cntr_depth);
+			circle(color, cv::Point(cntr_depth.X, cntr_depth.Y), 5, cv::Scalar(255, 0, 255), -1);
 
-			//for (int i = 0; i < eigen_vector_size; i++)
-			//{
-			//	Point3d p1 = cntr + 100.0* Point3d(eigen_vecs[i].x * eigen_val[i], eigen_vecs[i].y* eigen_val[i], eigen_vecs[i].z* eigen_val[i]);
-			//	DepthSpacePoint p1_depth;
-			//	cntr_cam.X = p1.x;
-			//	cntr_cam.Y = 0.4226*(p1.y - height) - 0.9063*p1.z;
-			//	cntr_cam.Z = -0.9063*(p1.y - height) - 0.4226*p1.z;
-			//	m_pCoordinateMapper->MapCameraPointToDepthSpace(cntr_cam, &p1_depth);
-			//	//drawAxis(color, cv::Point(cntr_depth.X, cntr_depth.Y), cv::Point(p1_depth.X, p1_depth.Y), Scalar(255 * i, 255, 255 * (i / 2)), 1);
-			//}
+			for (int i = 0; i < eigen_vector_size; i++)
+			{
+				Point3d p1 = cntr + 0.1*Point3d(eigen_vecs[i].x , eigen_vecs[i].y, eigen_vecs[i].z);
+				DepthSpacePoint p1_depth;
+				worldtoCameraSpace(cntr_cam, p1.x, p1.y, p1.z);
+				m_pCoordinateMapper->MapCameraPointToDepthSpace(cntr_cam, &p1_depth);
+				drawAxis(color, cv::Point(cntr_depth.X, cntr_depth.Y), cv::Point(p1_depth.X, p1_depth.Y), Scalar(255 * i, 255, 255 * (i / 2)), 1);
+			}
 		}
 	}
 }
 
-void Tracker::pcaFinger(Point2f rh_d)
+void Tracker::pcaFinger(Point2f rh_d, Mat color)
 {
+	palmEnergy = 0;
 	//for every finger segment found
 	for (int k = 0; k < 6; k++)
 	{
 		if (valid_finger[k] && detectedPalm)
 		{
-			vector<Point3d> pts_finger;
+			vector<Point3f> pts_finger;
 			for (int j = rh_d.y - 75, m = 0; j < rh_d.y + 75, m < 150; j++, m++)
 			{
 				for (int i = rh_d.x - 75, n = 0; j < rh_d.x + 75, n < 150; i++, n++)
@@ -964,10 +1058,9 @@ void Tracker::pcaFinger(Point2f rh_d)
 						CameraSpacePoint p = depthToCamera_points[index];
 						if (p.X != -std::numeric_limits<float>::infinity() && p.Y != -std::numeric_limits<float>::infinity())
 						{
-							double x = depthToCamera_points[index].X;
-							double y =  0.4226*p.Y - 0.9063*p.Z + height;
-							double z = -0.9063*p.Y - 0.4226*p.Z;
-							pts_finger.push_back(Point3d(x, y, z));
+							float x, y, z;
+							cameraToWorldSpace(p, &x, &y, &z);
+							pts_finger.push_back(Point3f(x, y, z));
 						}
 					}
 				}
@@ -976,36 +1069,36 @@ void Tracker::pcaFinger(Point2f rh_d)
 			int sz = static_cast<int>(pts_finger.size());
 			if (sz > 0)
 			{
-				Mat data_pts = Mat(sz, 3, CV_64FC1);
+				Mat data_pts = Mat(sz, 3, CV_32FC1);
 				for (int i = 0; i < data_pts.rows; ++i)
 				{
-					data_pts.at<double>(i, 0) = pts_finger[i].x;
-					data_pts.at<double>(i, 1) = pts_finger[i].y;
-					data_pts.at<double>(i, 2) = pts_finger[i].z;
+					data_pts.at<float>(i, 0) = pts_finger[i].x;
+					data_pts.at<float>(i, 1) = pts_finger[i].y;
+					data_pts.at<float>(i, 2) = pts_finger[i].z;
 				}
 
 				PCA pca_analysis(data_pts, Mat(), CV_PCA_DATA_AS_ROW);
 
-				Point3d cntr = Point3d(pca_analysis.mean.at<double>(0, 0),
-					pca_analysis.mean.at<double>(0, 1), pca_analysis.mean.at<double>(0, 2));
+				Point3d cntr = Point3d(pca_analysis.mean.at<float>(0, 0),
+					pca_analysis.mean.at<float>(0, 1), pca_analysis.mean.at<float>(0, 2));
 
 				Point3d direction = cntr - palmCenter;
 
 				int eigen_vector_size = pca_analysis.eigenvectors.rows;
 				//Store the eigenvalues and eigenvectors
 				vector<Point3d> eigen_vecs(eigen_vector_size);
-				vector<double> eigen_val(eigen_vector_size);
+				vector<float> eigen_val(eigen_vector_size);
 
 				Point3d max_eigen_vecs;
-				double max_eigen_val;
-				double max_value = -999999;
+				float max_eigen_val;
+				float max_value = -999999;
 
 				for (int i = 0; i < eigen_vector_size; i++)
 				{
-					eigen_vecs[i] = Point3d(pca_analysis.eigenvectors.at<double>(i, 0),
-						pca_analysis.eigenvectors.at<double>(i, 1), pca_analysis.eigenvectors.at<double>(i, 2));
-					eigen_val[i] = pca_analysis.eigenvalues.at<double>(i, 0);
-					double project_value = eigen_vecs[i].dot(direction);
+					eigen_vecs[i] = Point3d(pca_analysis.eigenvectors.at<float>(i, 0),
+						pca_analysis.eigenvectors.at<float>(i, 1), pca_analysis.eigenvectors.at<float>(i, 2));
+					eigen_val[i] = pca_analysis.eigenvalues.at<float>(i, 0);
+					float project_value = eigen_vecs[i].dot(direction);
 					if (project_value > max_value)
 					{
 						max_eigen_vecs = eigen_vecs[i];
@@ -1022,7 +1115,7 @@ void Tracker::pcaFinger(Point2f rh_d)
 					}
 				}
 
-				double norm = sqrt(max_eigen_vecs.x * max_eigen_vecs.x + max_eigen_vecs.y * max_eigen_vecs.y + max_eigen_vecs.z * max_eigen_vecs.z);
+				float norm = sqrt(max_eigen_vecs.x * max_eigen_vecs.x + max_eigen_vecs.y * max_eigen_vecs.y + max_eigen_vecs.z * max_eigen_vecs.z);
 				Point3d temp_direction = Point3d(max_eigen_vecs.x / norm, max_eigen_vecs.y / norm, max_eigen_vecs.z / norm);
 				palmEnergy += temp_direction.dot(palmFaceVector);
 
@@ -1036,34 +1129,31 @@ void Tracker::pcaFinger(Point2f rh_d)
 					p = depthToCamera_points[index];
 				}
 
-				double x = p.X;
-				double y = 0.4226*p.Y - 0.9063*p.Z + height;
-				double z = -0.9063*p.Y - 0.4226*p.Z;
+				float x, y, z;
+				cameraToWorldSpace(p, &x, &y, &z);
 				fingerTipPosition.push_back(Point3d(x, y, z));
 
-				/*				CameraSpacePoint fin_cam;
-				DepthSpacePoint fin_depth;
-				fin_cam.X = x;
-				fin_cam.Y = 0.4226*(y - height) - 0.9063*z;
-				fin_cam.Z = -0.9063*(y - height) - 0.4426*z;
-				m_pCoordinateMapper->MapCameraPointToDepthSpace(fin_cam, &fin_depth);
-				circle(color, cv::Point(fin_depth.X, fin_depth.Y), 3, cv::Scalar(0, 0, 255), 1);
+				//CameraSpacePoint fin_cam;
+				//DepthSpacePoint fin_depth;
+				//
+				//m_pCoordinateMapper->MapCameraPointToDepthSpace(fin_cam, &fin_depth);
+				//circle(color, cv::Point(fin_depth.X, fin_depth.Y), 3, cv::Scalar(0, 0, 255), 1);
 
-				CameraSpacePoint cntr_cam;
-				DepthSpacePoint cntr_depth;
-				cntr_cam.X = cntr.x;
-				cntr_cam.Y = 0.4226*(cntr.y - height) - 0.9063*cntr.z;
-				cntr_cam.Z = -0.9063*(cntr.y - height) - 0.4426*cntr.z;
-				m_pCoordinateMapper->MapCameraPointToDepthSpace(cntr_cam, &cntr_depth);
-				circle(color, cv::Point(cntr_depth.X, cntr_depth.Y), 2, cv::Scalar(255, 0, 255), -1);
+				//CameraSpacePoint cntr_cam;
+				//DepthSpacePoint cntr_depth;
+				//cntr_cam.X = cntr.x;
+				//cntr_cam.Y = 0.4226*(cntr.y - height) - 0.9063*cntr.z;
+				//cntr_cam.Z = -0.9063*(cntr.y - height) - 0.4426*cntr.z;
+				//m_pCoordinateMapper->MapCameraPointToDepthSpace(cntr_cam, &cntr_depth);
+				//circle(color, cv::Point(cntr_depth.X, cntr_depth.Y), 2, cv::Scalar(255, 0, 255), -1);
 
-				Point3d p1 = cntr + 100.0* Point3d(max_eigen_vecs.x * max_eigen_val, max_eigen_vecs.y* max_eigen_val, max_eigen_vecs.z* max_eigen_val);
-				DepthSpacePoint p1_depth;
-				cntr_cam.X = p1.x;
-				cntr_cam.Y = 0.4226*(p1.y - height) - 0.9063*p1.z;
-				cntr_cam.Z = -0.9063*(p1.y - height) - 0.4426*p1.z;
-				m_pCoordinateMapper->MapCameraPointToDepthSpace(cntr_cam, &p1_depth);
-				drawAxis(color, cv::Point(cntr_depth.X, cntr_depth.Y), cv::Point(p1_depth.X, p1_depth.Y), Scalar(255, 255, 0), 1);*/
+				//Point3d p1 = cntr + 100.0* Point3d(max_eigen_vecs.x * max_eigen_val, max_eigen_vecs.y* max_eigen_val, max_eigen_vecs.z* max_eigen_val);
+				//DepthSpacePoint p1_depth;
+				//cntr_cam.X = p1.x;
+				//cntr_cam.Y = 0.4226*(p1.y - height) - 0.9063*p1.z;
+				//cntr_cam.Z = -0.9063*(p1.y - height) - 0.4426*p1.z;
+				//m_pCoordinateMapper->MapCameraPointToDepthSpace(cntr_cam, &p1_depth);
+				//drawAxis(color, cv::Point(cntr_depth.X, cntr_depth.Y), cv::Point(p1_depth.X, p1_depth.Y), Scalar(255, 255, 0), 1);
 			}
 		}
 	}
@@ -1072,39 +1162,43 @@ void Tracker::pcaFinger(Point2f rh_d)
 void Tracker::predictFinger()
 {
 	
-		Mat finger_base = (Mat_<double>(4, 5) << -particleRadius * 3, -particleRadius * 2, 0, particleRadius * 2, particleRadius * 4,
+		Mat finger_base = (Mat_<float>(4, 5) << -particleRadius * 3, -particleRadius * 2, 0, particleRadius * 2, particleRadius * 4,
 			-particleRadius*1.33, particleRadius * 4, particleRadius * 4, particleRadius * 3.5, particleRadius * 3,
 			-particleRadius, 0, 0, 0, 0,
 			1, 1, 1, 1, 1);
 
-		double finger_scale[5] = { 0.072, 0.072, 0.084, 0.072, 0.06 };
+		float finger_scale[5] = { 0.072, 0.072, 0.084, 0.072, 0.06 };
 
-		double q[4];
+		float q[4];
 
-		double energy = 0;
-		double energyReverse = 0;
-		bool handReverse = true;
-		bool lastHandOrientation = true;
+		float energy = 0;
+		float energyReverse = 0;
+		bool handReverse = false;
+		bool lastHandOrientation = false;
 		bool determined = false;
-		Mat result(4, 5, CV_64F);
-		Mat result_flip(4, 5, CV_64F);
+		Mat result(4, 5, CV_32F);
+		Mat result_flip(4, 5, CV_32F);
 
 
 
 		if (palmEnergy > 2.0 || palmEnergy < -2.0)
 			determined = true;
 
+		DBOUT(palmEnergy);
+
 		if (palmEnergy > 2.0 && determined)
 		{
 			result = globalTranslate*globalRotate*finger_base;
 			handReverse = true;
 			lastHandOrientation = true;
+			DBOUT("Determined normal");
 		}
 		else if (palmEnergy < -2.0 && determined)
 		{
 			result = globalTranslate*globalRotateReverse*finger_base;
 			handReverse = false;
 			lastHandOrientation = false;
+			DBOUT("Determined reverse");
 		}
 		else
 		{
@@ -1125,11 +1219,11 @@ void Tracker::predictFinger()
 				for (int i = 0; i < result.cols; i++)
 				{
 					//--Propagate fingertip posistion from hand orientation and finger direction--
-					Point3d finger_forward = Point3d(result.at<double>(0, i) + finger_scale[i] * fingerDirection[j].x,
-						result.at<double>(1, i) + finger_scale[i] * fingerDirection[j].y,
-						result.at<double>(2, i) + finger_scale[i] * fingerDirection[j].z);
+					Point3d finger_forward = Point3d(result.at<float>(0, i) + finger_scale[i] * fingerDirection[j].x,
+						result.at<float>(1, i) + finger_scale[i] * fingerDirection[j].y,
+						result.at<float>(2, i) + finger_scale[i] * fingerDirection[j].z);
 					//--Compare with the actual detected fingertip position--
-					double distance = (fingerTipPosition[j].x - finger_forward.x)*(fingerTipPosition[j].x - finger_forward.x) +
+					float distance = (fingerTipPosition[j].x - finger_forward.x)*(fingerTipPosition[j].x - finger_forward.x) +
 						(fingerTipPosition[j].y - finger_forward.y)*(fingerTipPosition[j].y - finger_forward.y) +
 						(fingerTipPosition[j].z - finger_forward.z)*(fingerTipPosition[j].z - finger_forward.z);
 
@@ -1179,12 +1273,12 @@ void Tracker::predictFinger()
 			{
 				int i = finger_index[j];
 				//cout << "Finger position " << i << endl;
-				//Point3d finger_forward = Point3d(result.at<double>(0, i) + finger_scale[i] * fingerDirection[j].x,
-				//	result.at<double>(1, i) + finger_scale[i] * fingerDirection[j].y,
-				//	result.at<double>(2, i) + finger_scale[i] * fingerDirection[j].z);
-				//Point3d finger_forward = Point3d(result.at<double>(0, i),
-				//result.at<double>(1, i) ,
-				//result.at<double>(2, i) );
+				//Point3d finger_forward = Point3d(result.at<float>(0, i) + finger_scale[i] * fingerDirection[j].x,
+				//	result.at<float>(1, i) + finger_scale[i] * fingerDirection[j].y,
+				//	result.at<float>(2, i) + finger_scale[i] * fingerDirection[j].z);
+				//Point3d finger_forward = Point3d(result.at<float>(0, i),
+				//result.at<float>(1, i) ,
+				//result.at<float>(2, i) );
 
 				detected_finger[i] = true;
 				Mat tempTransform;
@@ -1206,35 +1300,36 @@ void Tracker::predictFinger()
 
 			if (palmEnergy > 2.0)
 			{
-				m[0][0] = globalRotate.at<double>(0, 0);
-				m[0][1] = globalRotate.at<double>(0, 1);
-				m[0][2] = globalRotate.at<double>(0, 2);
+				m[0][0] = globalRotate.at<float>(0, 0);
+				m[0][1] = globalRotate.at<float>(0, 1);
+				m[0][2] = globalRotate.at<float>(0, 2);
 
-				m[1][0] = globalRotate.at<double>(1, 0);
-				m[1][1] = globalRotate.at<double>(1, 1);
-				m[1][2] = globalRotate.at<double>(1, 2);
+				m[1][0] = globalRotate.at<float>(1, 0);
+				m[1][1] = globalRotate.at<float>(1, 1);
+				m[1][2] = globalRotate.at<float>(1, 2);
 
-				m[2][0] = globalRotate.at<double>(2, 0);
-				m[2][1] = globalRotate.at<double>(2, 1);
-				m[2][2] = globalRotate.at<double>(2, 2);
+				m[2][0] = globalRotate.at<float>(2, 0);
+				m[2][1] = globalRotate.at<float>(2, 1);
+				m[2][2] = globalRotate.at<float>(2, 2);
 			}
 			else
 			{
-				m[0][0] = globalRotateReverse.at<double>(0, 0);
-				m[0][1] = globalRotateReverse.at<double>(0, 1);
-				m[0][2] = globalRotateReverse.at<double>(0, 2);
+				m[0][0] = globalRotateReverse.at<float>(0, 0);
+				m[0][1] = globalRotateReverse.at<float>(0, 1);
+				m[0][2] = globalRotateReverse.at<float>(0, 2);
 
-				m[1][0] = globalRotateReverse.at<double>(1, 0);
-				m[1][1] = globalRotateReverse.at<double>(1, 1);
-				m[1][2] = globalRotateReverse.at<double>(1, 2);
+				m[1][0] = globalRotateReverse.at<float>(1, 0);
+				m[1][1] = globalRotateReverse.at<float>(1, 1);
+				m[1][2] = globalRotateReverse.at<float>(1, 2);
 
-				m[2][0] = globalRotateReverse.at<double>(2, 0);
-				m[2][1] = globalRotateReverse.at<double>(2, 1);
-				m[2][2] = globalRotateReverse.at<double>(2, 2);
+				m[2][0] = globalRotateReverse.at<float>(2, 0);
+				m[2][1] = globalRotateReverse.at<float>(2, 1);
+				m[2][2] = globalRotateReverse.at<float>(2, 2);
 			}
 		}
 		else
 		{
+			DBOUT(" UnDetermined");
 			//-- if not determinded before hand have to test both hand orientation--
 			int r[5][5] = { { 0 } };
 			int maximum = 0;
@@ -1243,10 +1338,10 @@ void Tracker::predictFinger()
 				int position = -1;
 				for (int i = 0; i < result.cols; i++)
 				{
-					Point3d finger_forward = Point3d(result.at<double>(0, i) + finger_scale[i] * fingerDirection[j].x,
-						result.at<double>(1, i) + finger_scale[i] * fingerDirection[j].y,
-						result.at<double>(2, i) + finger_scale[i] * fingerDirection[j].z);
-					double distance = (fingerTipPosition[j].x - finger_forward.x)*(fingerTipPosition[j].x - finger_forward.x) +
+					Point3d finger_forward = Point3d(result.at<float>(0, i) + finger_scale[i] * fingerDirection[j].x,
+						result.at<float>(1, i) + finger_scale[i] * fingerDirection[j].y,
+						result.at<float>(2, i) + finger_scale[i] * fingerDirection[j].z);
+					float distance = (fingerTipPosition[j].x - finger_forward.x)*(fingerTipPosition[j].x - finger_forward.x) +
 						(fingerTipPosition[j].y - finger_forward.y)*(fingerTipPosition[j].y - finger_forward.y) +
 						(fingerTipPosition[j].z - finger_forward.z)*(fingerTipPosition[j].z - finger_forward.z);
 
@@ -1289,14 +1384,14 @@ void Tracker::predictFinger()
 
 			for (int j = 0; j < fingerDirection.size() && j < 5; j++)
 			{
-				double minimized = 999999999;
+				float minimized = 999999999;
 				int position = -1;
 				for (int i = 0; i < result_flip.cols; i++)
 				{
-					Point3d finger_forward = Point3d(result_flip.at<double>(0, i) + finger_scale[i] * fingerDirection[j].x,
-						result_flip.at<double>(1, i) + finger_scale[i] * fingerDirection[j].y,
-						result_flip.at<double>(2, i) + finger_scale[i] * fingerDirection[j].z);
-					double distance = (fingerTipPosition[j].x - finger_forward.x)*(fingerTipPosition[j].x - finger_forward.x) +
+					Point3d finger_forward = Point3d(result_flip.at<float>(0, i) + finger_scale[i] * fingerDirection[j].x,
+						result_flip.at<float>(1, i) + finger_scale[i] * fingerDirection[j].y,
+						result_flip.at<float>(2, i) + finger_scale[i] * fingerDirection[j].z);
+					float distance = (fingerTipPosition[j].x - finger_forward.x)*(fingerTipPosition[j].x - finger_forward.x) +
 						(fingerTipPosition[j].y - finger_forward.y)*(fingerTipPosition[j].y - finger_forward.y) +
 						(fingerTipPosition[j].z - finger_forward.z)*(fingerTipPosition[j].z - finger_forward.z);
 
@@ -1334,10 +1429,14 @@ void Tracker::predictFinger()
 
 			hungarian_fini(&prob2);
 
-			if (lastHandOrientation)
+	/*		if (lastHandOrientation)
 				energyReverse += 30.0;
 			else
-				energy += 30.0;
+				energy += 30.0;*/
+			DBOUT("\n");
+			DBOUT(energy);
+			DBOUT("\n");
+			DBOUT(energyReverse);
 
 			if (energyReverse < energy)
 			{
@@ -1347,13 +1446,13 @@ void Tracker::predictFinger()
 					int i = finger_index_flip[j];
 					detected_finger[i] = true;
 					//cout << "Finger position " << i << endl;
-					Point3d finger_forward = Point3d(result_flip.at<double>(0, i) + finger_scale[i] * fingerDirection[j].x,
-						result_flip.at<double>(1, i) + finger_scale[i] * fingerDirection[j].y,
-						result_flip.at<double>(2, i) + finger_scale[i] * fingerDirection[j].z);
+					Point3d finger_forward = Point3d(result_flip.at<float>(0, i) + finger_scale[i] * fingerDirection[j].x,
+						result_flip.at<float>(1, i) + finger_scale[i] * fingerDirection[j].y,
+						result_flip.at<float>(2, i) + finger_scale[i] * fingerDirection[j].z);
 
-					//Point3d finger_forward = Point3d(result_flip.at<double>(0, i) ,
-					//					result_flip.at<double>(1, i) ,
-					//					result.at<double>(2, i));
+					//Point3d finger_forward = Point3d(result_flip.at<float>(0, i) ,
+					//					result_flip.at<float>(1, i) ,
+					//					result.at<float>(2, i));
 
 					assignFingerTip(i, fingerDirection[j], globalRotateReverse, suggestParameter);
 
@@ -1366,17 +1465,17 @@ void Tracker::predictFinger()
 					//circle(color, cv::Point(cntr_depth.X, cntr_depth.Y), 3, cv::Scalar(i*51, 255, 255), -1);
 				}
 
-				m[0][0] = globalRotateReverse.at<double>(0, 0);
-				m[0][1] = globalRotateReverse.at<double>(0, 1);
-				m[0][2] = globalRotateReverse.at<double>(0, 2);
+				m[0][0] = globalRotateReverse.at<float>(0, 0);
+				m[0][1] = globalRotateReverse.at<float>(0, 1);
+				m[0][2] = globalRotateReverse.at<float>(0, 2);
 
-				m[1][0] = globalRotateReverse.at<double>(1, 0);
-				m[1][1] = globalRotateReverse.at<double>(1, 1);
-				m[1][2] = globalRotateReverse.at<double>(1, 2);
+				m[1][0] = globalRotateReverse.at<float>(1, 0);
+				m[1][1] = globalRotateReverse.at<float>(1, 1);
+				m[1][2] = globalRotateReverse.at<float>(1, 2);
 
-				m[2][0] = globalRotateReverse.at<double>(2, 0);
-				m[2][1] = globalRotateReverse.at<double>(2, 1);
-				m[2][2] = globalRotateReverse.at<double>(2, 2);
+				m[2][0] = globalRotateReverse.at<float>(2, 0);
+				m[2][1] = globalRotateReverse.at<float>(2, 1);
+				m[2][2] = globalRotateReverse.at<float>(2, 2);
 			}
 			else
 			{
@@ -1386,13 +1485,13 @@ void Tracker::predictFinger()
 					int i = finger_index[j];
 					detected_finger[i] = true;
 					//cout << "Finger position " << i << endl;
-					Point3d finger_forward = Point3d(result.at<double>(0, i) + finger_scale[i] * fingerDirection[j].x,
-						result.at<double>(1, i) + finger_scale[i] * fingerDirection[j].y,
-						result.at<double>(2, i) + finger_scale[i] * fingerDirection[j].z);
+					Point3d finger_forward = Point3d(result.at<float>(0, i) + finger_scale[i] * fingerDirection[j].x,
+						result.at<float>(1, i) + finger_scale[i] * fingerDirection[j].y,
+						result.at<float>(2, i) + finger_scale[i] * fingerDirection[j].z);
 
-					/*				Point3d finger_forward = Point3d(result_flip.at<double>(0, i) ,
-					result_flip.at<double>(1, i) ,
-					result.at<double>(2, i));*/
+					/*				Point3d finger_forward = Point3d(result_flip.at<float>(0, i) ,
+					result_flip.at<float>(1, i) ,
+					result.at<float>(2, i));*/
 
 					assignFingerTip(i, fingerDirection[j], globalRotate, suggestParameter);
 
@@ -1406,22 +1505,22 @@ void Tracker::predictFinger()
 					//circle(color, cv::Point(cntr_depth.X, cntr_depth.Y), 3, cv::Scalar(i * 51, 255, 255), -1);
 				}
 
-				m[0][0] = globalRotate.at<double>(0, 0);
-				m[0][1] = globalRotate.at<double>(0, 1);
-				m[0][2] = globalRotate.at<double>(0, 2);
+				m[0][0] = globalRotate.at<float>(0, 0);
+				m[0][1] = globalRotate.at<float>(0, 1);
+				m[0][2] = globalRotate.at<float>(0, 2);
 
-				m[1][0] = globalRotate.at<double>(1, 0);
-				m[1][1] = globalRotate.at<double>(1, 1);
-				m[1][2] = globalRotate.at<double>(1, 2);
+				m[1][0] = globalRotate.at<float>(1, 0);
+				m[1][1] = globalRotate.at<float>(1, 1);
+				m[1][2] = globalRotate.at<float>(1, 2);
 
-				m[2][0] = globalRotate.at<double>(2, 0);
-				m[2][1] = globalRotate.at<double>(2, 1);
-				m[2][2] = globalRotate.at<double>(2, 2);
+				m[2][0] = globalRotate.at<float>(2, 0);
+				m[2][1] = globalRotate.at<float>(2, 1);
+				m[2][2] = globalRotate.at<float>(2, 2);
 			}
 		
 	}
 
-	double factor;
+	float factor;
 	if (handReverse)
 	{
 		lastHandOrientation = true;
@@ -1518,23 +1617,23 @@ void Tracker::assignFingerTip(int finger_index, Point3d fingertipDirection, Mat 
 	else if (finger_index == 4) rroll = 19, rpitch = 20;
 
 	Point3d finger_rotate;
-	Mat direction(4, 1, CV_64F);
-	Mat r(4, 1, CV_64F);
+	Mat direction(4, 1, CV_32F);
+	Mat r(4, 1, CV_32F);
 
-	direction.at<double>(0, 0) = fingertipDirection.x;
-	direction.at<double>(1, 0) = fingertipDirection.y;
-	direction.at<double>(2, 0) = fingertipDirection.z;
-	direction.at<double>(3, 0) = 1;
+	direction.at<float>(0, 0) = fingertipDirection.x;
+	direction.at<float>(1, 0) = fingertipDirection.y;
+	direction.at<float>(2, 0) = fingertipDirection.z;
+	direction.at<float>(3, 0) = 1;
 
 	r = global_rotate.inv() *direction;
 
-	calculateFingerRotation(Point3d(r.at<double>(0, 0), r.at<double>(1, 0), r.at<double>(2, 0)),
+	calculateFingerRotation(Point3d(r.at<float>(0, 0), r.at<float>(1, 0), r.at<float>(2, 0)),
 		&suggestParameter[rroll], &suggestParameter[rpitch]);
 }
 
 void Tracker::calculateFingerRotation(Point3d finger_direction, float* rpitch, float* rroll)
 {
-	double norm = sqrt(finger_direction.z*finger_direction.z + finger_direction.y*finger_direction.y);
+	float norm = sqrt(finger_direction.z*finger_direction.z + finger_direction.y*finger_direction.y);
 	Point3d othogonal_no_x = Point3d(0, -finger_direction.z / norm, finger_direction.y / norm);
 	if (finger_direction.x == 1 && finger_direction.y == 0 && finger_direction.z == 0)
 	{
@@ -1551,7 +1650,7 @@ void Tracker::calculateFingerRotation(Point3d finger_direction, float* rpitch, f
 	}
 
 	Point3d othogonal2 = finger_direction.cross(othogonal_no_x);
-	double norm2 = sqrt(othogonal2.y*othogonal2.y + othogonal2.x*othogonal2.x + othogonal2.z*othogonal2.z);
+	float norm2 = sqrt(othogonal2.y*othogonal2.y + othogonal2.x*othogonal2.x + othogonal2.z*othogonal2.z);
 	Point3d othogonal_x = Point3d(othogonal2.x / norm2, othogonal2.y / norm2, othogonal2.z / norm2);
 
 	//cout << othogonal_x.x << " " << finger_direction.x << " " << othogonal_no_x.x << " "  << endl;
@@ -1559,11 +1658,11 @@ void Tracker::calculateFingerRotation(Point3d finger_direction, float* rpitch, f
 	//cout << othogonal_x.z << " " << finger_direction.z << " " << othogonal_no_x.z << " " << endl;
 	//cout << endl;
 
-	double yaw, roll, pitch;
+	float yaw, roll, pitch;
 
 	pitch = asin(-othogonal_no_x.y);
-	double threshold = 0.001; // Hardcoded constant - burn him, he's a witch
-	double thes = cos(pitch);
+	float threshold = 0.001; // Hardcoded constant - burn him, he's a witch
+	float thes = cos(pitch);
 	if (thes > threshold) {
 		roll = atan2(othogonal_x.y, finger_direction.y);
 		yaw = atan2(othogonal_no_x.x, othogonal_no_x.z);
@@ -1600,12 +1699,12 @@ void Tracker::gradient(D3DXVECTOR4* HandSurface, D3DXVECTOR4* HandOut, float* ou
 	else if (parameter == 25 || parameter == 26) size = 4, offset = 44;
 
 	std::default_random_engine generator;
-	std::uniform_real_distribution<double> distribution(0.0, 1.0);
+	std::uniform_real_distribution<float> distribution(0.0, 1.0);
 	bool increasing = true;
 
 
-	double lastEnergy = 0;
-	double v;
+	float lastEnergy = 0;
+	float v;
 	for (int i = 0; i < 256; i++)
 	{
 		float min_distance = 999999;
@@ -1627,7 +1726,7 @@ void Tracker::gradient(D3DXVECTOR4* HandSurface, D3DXVECTOR4* HandOut, float* ou
 
 	for (int m = 1; m < 10; m++)
 	{
-		double energy = 0;
+		float energy = 0;
 		handEncoding(outputParameter, HandOut);
 		for (int i = 0; i < 256; i++)
 		{
@@ -1698,22 +1797,19 @@ float Tracker::compareHand(float* HandParameter, Mat& depthMap, Point Handcenter
 	float e_b_minus = 0;
 	float e_l = 0;
 	float result = 0;
-	float convert_pixel_to_m = handCenter_depth*tan(35.3*PI / 180.0f) / 256000.0f;
+	float convert_pixel_to_m = handCenter_depth*tan_deg / 256000.0f;
 
 	CameraSpacePoint* spacePoint = new CameraSpacePoint[48]; // depthSpacePoint
 	for (int i = 0; i < 48; i++)
 	{
-
-		spacePoint[i].X = HandModel[i].x;
-		spacePoint[i].Y = 0.4226* (HandModel[i].y - height) - 0.9063*HandModel[i].z;
-		spacePoint[i].Z = -0.9063*(HandModel[i].y - height) - 0.4226*HandModel[i].z;
+		worldtoCameraSpace(spacePoint[i], HandModel[i].x, HandModel[i].y, HandModel[i].z);
 	}
 	m_pCoordinateMapper->MapCameraPointsToDepthSpace(48, spacePoint, 48, depthPoints);
 	for (int i = 0; i < 48; i++)
 	{
 		if (depthPoints[i].Y < 0 || depthPoints[i].Y >= 424 || depthPoints[i].X < 0 || depthPoints[i].X >= 512)
 		{
-			e_b += pow(200 * convert_pixel_to_m, 2.0f);
+			e_b += 200 * convert_pixel_to_m * 200 * convert_pixel_to_m;
 		}
 		else
 		{
@@ -1721,12 +1817,13 @@ float Tracker::compareHand(float* HandParameter, Mat& depthMap, Point Handcenter
 			if (depth != 0)
 			{
 				depth = depth / 1000.0f; // convert to meter
-				e_b += pow(max(0.0f, depth - spacePoint[i].Z), 2.0f);
+				float distance = depth - spacePoint[i].Z;
+				e_b += max(0.0f, distance)*max(0.0f,distance);
 			}
 			else
 			{
 				float distant = dist.at<float>(depthPoints[i].Y, depthPoints[i].X);
-				e_b += pow(distant * convert_pixel_to_m, 2.0f);
+				e_b += distant * convert_pixel_to_m * distant* convert_pixel_to_m;
 			}
 		}
 	}
@@ -1895,9 +1992,9 @@ float Tracker::compareHand(float* HandParameter, Mat& depthMap, Point Handcenter
 	//		float norm = sqrt(dx*dx + dy*dy + dz*dz);
 	//		e_l += pow(max(particleRadius * 3.0f - norm, 0.0f), 2.0f);
 	//	}
-
-	e_l = pow(-min(HandParameter[16] - HandParameter[20], 0.0f) - min(HandParameter[12] - HandParameter[16], 0.0f) -
-		min(HandParameter[8] - HandParameter[12], 0.0f), 2.0f);
+float angle_finger = -min(HandParameter[16] - HandParameter[20], 0.0f) - min(HandParameter[12] - HandParameter[16], 0.0f) -
+min(HandParameter[8] - HandParameter[12], 0.0f);
+e_l = angle_finger * angle_finger;
 
 	for (int i = 0; i < 256; i++)
 	{
@@ -1913,8 +2010,10 @@ float Tracker::compareHand(float* HandParameter, Mat& depthMap, Point Handcenter
 				min_distance = distance;
 			}
 		}
-		e_d += pow(sqrt(min_distance) - particleRadius, 2.0f);
+		float real_dist = sqrt(min_distance) - particleRadius;
+		e_d +=(real_dist*real_dist);
 	}
+	
 
 	result = (48.0f / 256.0f)*e_d + e_l + e_b;
 
@@ -2213,26 +2312,19 @@ float* Tracker::optimized(float inputConfig[27], float suggestConfig[27], Point 
 			xPbest[i][2] = x[i][2];
 			for (j = 3; j < 7; j++)
 			{
-				std::normal_distribution<float> distribution4(inputConfig[j], 0.2617);
+				std::normal_distribution<float> distribution4(inputConfig[j], 0.05);
 				x[i][j] = distribution4(generator);
 				v[i][j] = 0;
 				xPbest[i][j] = x[i][j];
 			}
 
-			for (j = 7; j < 9; j++)
+			for (j = 7; j < 27; j++)
 			{
 				std::normal_distribution<float> distribution4(inputConfig[j], 0.2617);
 
 				x[i][j] = distribution4(generator);
 				v[i][j] = 0;
 				xPbest[i][j] = x[i][j];
-			}
-
-			for (j = 9; j < 27; j++)
-			{
-				x[i][j] = inputConfig[j];
-				xPbest[i][j] = inputConfig[j];
-				v[i][j] = 0;
 			}
 			pbest[i] = 999999;
 		}
@@ -2263,26 +2355,19 @@ float* Tracker::optimized(float inputConfig[27], float suggestConfig[27], Point 
 			xPbest[i][2] = x[i][2];
 			for (j = 3; j < 7; j++)
 			{
-				std::normal_distribution<float> distribution4(inputConfig[j], 0.2617);
+				std::normal_distribution<float> distribution4(inputConfig[j], 0.05);
 				x[i][j] = distribution4(generator);
 				v[i][j] = 0;
 				xPbest[i][j] = x[i][j];
 			}
 
-			for (j = 7; j < 9; j++)
+			for (j = 7; j < 27; j++)
 			{
 				std::normal_distribution<float> distribution4(inputConfig[j], 0.2617);
 
 				x[i][j] = distribution4(generator);
 				v[i][j] = 0;
 				xPbest[i][j] = x[i][j];
-			}
-
-			for (j = 9; j < 27; j++)
-			{
-				x[i][j] = inputConfig[j];
-				xPbest[i][j] = inputConfig[j];
-				v[i][j] = 0;
 			}
 			pbest[i] = 999999;
 		}
@@ -2290,9 +2375,7 @@ float* Tracker::optimized(float inputConfig[27], float suggestConfig[27], Point 
 	D3DXVECTOR4* HandWorldSurface = new D3DXVECTOR4[256];
 	for (size_t i = 0; i < 256; ++i)
 	{
-		HandWorldSurface[i].x = HandSurface[i].X;
-		HandWorldSurface[i].y = 0.4226*HandSurface[i].Y - 0.9063*HandSurface[i].Z + height;
-		HandWorldSurface[i].z = -0.9063*HandSurface[i].Y - 0.4226*HandSurface[i].Z;
+		cameraToWorldSpace(HandSurface[i], &HandWorldSurface[i].x, &HandWorldSurface[i].y, &HandWorldSurface[i].z);
 	}
 	D3DXVECTOR4**output = new D3DXVECTOR4*[num_particle_pso];
 	for (i = 0; i < num_particle_pso; i++)
@@ -2321,7 +2404,7 @@ float* Tracker::optimized(float inputConfig[27], float suggestConfig[27], Point 
 		Mat samples(num_particle_pso, 1, CV_32F, &averageDistance);
 		//Mat samples(num_particle_pso, 27, CV_32F, &x);
 		Mat labels;
-		int attempts = 5;
+		int attempts = 1;
 		Mat centers;
 		kmeans(samples, 4, labels, TermCriteria(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 100, 0.0001), attempts, KMEANS_PP_CENTERS, centers);
 
@@ -2342,29 +2425,32 @@ float* Tracker::optimized(float inputConfig[27], float suggestConfig[27], Point 
 		{
 			if (energy[i] < pbest[i])
 			{
-				for (j = 0; j < 27; j++)
-				{
-					xPbest[i][j] = x[i][j];
-				}
+				//for (j = 0; j < 27; j++)
+				//{
+				//	xPbest[i][j] = x[i][j];
+				//}
+				std::copy(&x[i][0], &x[i][26], xPbest[i]);
 				pbest[i] = energy[i];
 			}
 
 			int index = labels.at<int>(i, 0);
 			if (energy[i] < labelBest[index])
 			{
-				for (j = 0; j < 27; j++)
-				{
-					xLabelBest[index][j] = x[i][j];
-				}
+				//for (j = 0; j < 27; j++)
+				//{
+				//	xLabelBest[index][j] = x[i][j];
+				//}
+				std::copy(&x[i][0], &x[i][26], xLabelBest[index]);
 				labelBest[index] = energy[i];
 			}
 
 			if (energy[i] < gbest)
 			{
-				for (j = 0; j < 27; j++)
-				{
-					outputConfig[j] = x[i][j];
-				}
+				//for (j = 0; j < 27; j++)
+				//{
+				//	outputConfig[j] = x[i][j];
+				//}
+				std::copy(&x[i][0], &x[i][26], outputConfig);
 				gbest = energy[i];
 			}
 		}
@@ -2426,7 +2512,7 @@ float* Tracker::optimized(float inputConfig[27], float suggestConfig[27], Point 
 			//	index = 0;
 			int index = labels.at<int>(i, 0);
 
-			for (j = 0; j < 9; j++)
+			for (j = 0; j < 27; j++)
 			{
 				v[i][j] = 0.729843f*(v[i][j] + (float)rand() / float(RAND_MAX)*2.8f *(xPbest[i][j] - x[i][j]) + 1.3f* (float)rand() / (float)RAND_MAX *(xLabelBest[index][j] - x[i][j]));
 				x[i][j] = x[i][j] + v[i][j];
@@ -2443,4 +2529,45 @@ float* Tracker::optimized(float inputConfig[27], float suggestConfig[27], Point 
 		}
 	}
 	return outputConfig;
+}
+
+void Tracker::cameraToWorldSpace(CameraSpacePoint camPoint, float* x, float*y, float*z)
+{
+	// convert from camera space - > world space
+	*x = camPoint.Y;
+	*y = -cos_deg*camPoint.X - sin_deg*camPoint.Z + height;
+	*z = sin_deg*camPoint.X - cos_deg*camPoint.Z;
+}
+
+void Tracker::worldtoCameraSpace(CameraSpacePoint &camPoint, float x, float y, float z)
+{
+	camPoint.X = -cos_deg*(y - height) + sin_deg*z;
+	camPoint.Y = x;
+	camPoint.Z = -sin_deg*(y - height) - cos_deg*z;
+}
+
+int Tracker::returnFrameCount()
+{
+	return frame;
+}
+
+void Tracker::drawAxis(Mat& img, Point p, Point q, Scalar colour, const float scale)
+{
+	double angle;
+	double hypotenuse;
+	angle = atan2((double)p.y - q.y, (double)p.x - q.x); // angle in radians
+	hypotenuse = sqrt((double)(p.y - q.y) * (p.y - q.y) + (p.x - q.x) * (p.x - q.x));
+	//    double degrees = angle * 180 / CV_PI; // convert radians to degrees (0-180 range)
+	//    cout << "Degrees: " << abs(degrees - 180) << endl; // angle in 0-360 degrees range
+	// Here we lengthen the arrow by a factor of scale
+	q.x = (int)(p.x - scale * hypotenuse * cos(angle));
+	q.y = (int)(p.y - scale * hypotenuse * sin(angle));
+	line(img, p, q, colour, 1, CV_AA);
+	// create the arrow hooks
+	p.x = (int)(q.x + 9 * cos(angle + CV_PI / 4));
+	p.y = (int)(q.y + 9 * sin(angle + CV_PI / 4));
+	line(img, p, q, colour, 1, CV_AA);
+	p.x = (int)(q.x + 9 * cos(angle - CV_PI / 4));
+	p.y = (int)(q.y + 9 * sin(angle - CV_PI / 4));
+	line(img, p, q, colour, 1, CV_AA);
 }

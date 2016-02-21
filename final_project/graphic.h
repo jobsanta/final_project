@@ -17,6 +17,8 @@
 #include "d3dUtil.h"
 #include <iostream>
 
+#include "physxHelper.h"
+
 #include <Optional\DXUTShapes.h>
 
 //#include "Box.h"
@@ -103,7 +105,7 @@ private:
 	PxFoundation*             gFoundation = NULL;
 
 	PxScene*              gScene = NULL;
-	PxReal                myTimestep = 1.0f / 20.0f;
+	PxReal                myTimestep = 1.0f / 30.0f;
 	vector<PxRigidActor*> boxes;
 	vector<PxRigidActor*> proxyParticle;
 	vector<PxRigidActor*> boxesJoint;

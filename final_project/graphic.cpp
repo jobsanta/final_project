@@ -192,17 +192,17 @@ bool Graphic::CreateDevice(HWND g_hWnd)
 	g_DXGISwapChainDesc.SampleDesc.Quality = 0;
 
 
-	//RECT rect;
-	//GetWindowRect(g_hWnd, &rect);
-	//g_DXGISwapChainDesc.Windowed = true;
-	//g_DXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = devMode.dmDisplayFrequency;
-	//g_DXGISwapChainDesc.BufferDesc.Width = rect.right - rect.left;
-	//g_DXGISwapChainDesc.BufferDesc.Height = rect.bottom - rect.top;
-	////// Fullscreen mode mode
-	g_DXGISwapChainDesc.Windowed = FALSE;
-	//g_DXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = devMode.dmDisplayFrequency;
-	g_DXGISwapChainDesc.BufferDesc.Width = devMode.dmPelsWidth;
-	g_DXGISwapChainDesc.BufferDesc.Height = devMode.dmPelsHeight;
+	RECT rect;
+	GetWindowRect(g_hWnd, &rect);
+	g_DXGISwapChainDesc.Windowed = true;
+	g_DXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = devMode.dmDisplayFrequency;
+	g_DXGISwapChainDesc.BufferDesc.Width = rect.right - rect.left;
+	g_DXGISwapChainDesc.BufferDesc.Height = rect.bottom - rect.top;
+	//////// Fullscreen mode mode
+	//g_DXGISwapChainDesc.Windowed = FALSE;
+	////g_DXGISwapChainDesc.BufferDesc.RefreshRate.Numerator = devMode.dmDisplayFrequency;
+	//g_DXGISwapChainDesc.BufferDesc.Width = devMode.dmPelsWidth;
+	//g_DXGISwapChainDesc.BufferDesc.Height = devMode.dmPelsHeight;
 
 	hr = D3D10CreateDeviceAndSwapChain(
 		capableAdapter,
@@ -460,7 +460,7 @@ void Graphic::Render(float x, float y, float z)
 
 
 
-	if (frameNb > 2)
+	if (frameNb > 10)
 	{
 		if (frameNb <= 20)
 		{
@@ -485,15 +485,17 @@ void Graphic::Render(float x, float y, float z)
 				PxVec3 offset(0, 0.01, 0);
 				if (boxesJoint[i] != NULL && particleJoint[i] != NULL)
 				{
-					PxDistanceJoint* joint = PxDistanceJointCreate(*gPhysicsSDK, boxesJoint[i], PxTransform(-offset), particleJoint[i], PxTransform(offset));
-					if (joint != NULL)
-					{
-						joint->setMaxDistance(0.5f);
-						joint->setDamping(0.5);
-						joint->setStiffness(2000.0f);
-						joint->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
-						joint->setDistanceJointFlag(PxDistanceJointFlag::eMAX_DISTANCE_ENABLED, true);
-					}
+					//PxDistanceJoint* joint = PxDistanceJointCreate(*gPhysicsSDK, boxesJoint[i], PxTransform(-offset), particleJoint[i], PxTransform(offset));
+					//if (joint != NULL)
+					//{
+					//	joint->setMaxDistance(0.1f);
+					//	joint->setDamping(0.5);
+					//	joint->setStiffness(1000.0f);
+					//	joint->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
+					//	joint->setDistanceJointFlag(PxDistanceJointFlag::eMAX_DISTANCE_ENABLED, true);
+					//}
+					//PxFixedJoint* joint = PxFixedJointCreate(*gPhysicsSDK, boxesJoint[i], PxTransform(-offset), particleJoint[i], PxTransform(offset));
+
 				}
 			}
 			boxesJoint.clear();
@@ -672,8 +674,10 @@ void Graphic::InitializePhysX()
 
 	for (int i = 0; i < 2; i++)
 	{
-		transform.p = PxVec3(-1.0f+2.0f * i, 3.0f, -2.0f);
+		transform.p = PxVec3(-1.0f+2.0f * i, 3.0f, -4.0f);
 		PxRigidDynamic *actor = PxCreateDynamic(*gPhysicsSDK, transform, geometry, *mMaterial, density);
+		//setupFiltering(actor, FilterGroup::eBox, FilterGroup::ePARTICLE);
+
 		actor->setMass(0.5);
 
 		actor->setAngularDamping(0.75);
@@ -801,27 +805,28 @@ void Graphic::DrawSphere(PxRigidActor* actor , int index)
 	mfxWVPVar_Sphere->SetMatrix((float*)&mWVP);
 	if (index < 16)
 	{
-		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)GREEN));
+
+		mfxColor_Sphere->SetFloatVector(D3DXVECTOR4(1.0,1.0,1.0,1.0));
 	}
 	else if (index >= 16 && index < 22)
 	{
-		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)RED));
+		mfxColor_Sphere->SetFloatVector(D3DXVECTOR4(1.0, 0.0, 1.0, 1.0));
 	}
 	else if (index >= 22 && index < 28)
 	{
-		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)BLUE));
+		mfxColor_Sphere->SetFloatVector(D3DXVECTOR4(0.0, 0.0,1.0, 1.0));
 	}
 	else if (index >= 28 && index < 34)
 	{
-		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)CYAN));
+		mfxColor_Sphere->SetFloatVector(D3DXVECTOR4(0.0, 1.0, 0.0, 1.0));
 	}
 	else if (index >= 34 && index < 40)
 	{
-		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)MAGENTA));
+		mfxColor_Sphere->SetFloatVector(D3DXVECTOR4(0.0, 1.0, 1.0, 1.0));
 	}
 	else if (index >= 40)
 	{
-		mfxColor_Sphere->SetFloatVector(((D3DXVECTOR4)YELLOW));
+		mfxColor_Sphere->SetFloatVector(D3DXVECTOR4(1.0, 1.0, 0.0, 1.0));
 	}
 	
 	D3D10_TECHNIQUE_DESC techDesc;
@@ -897,34 +902,42 @@ void Graphic::onContact(const PxContactPairHeader& pairHeader, const PxContactPa
 	const PxU32 buff = 64; //buffer size
 	PxContactPairPoint contacts[buff];
 
+	//PxFilterData filterData = pairs->shapes[0]->getSimulationFilterData();
+
 	//loop through all contact pairs of PhysX simulation
 	for (PxU32 i = 0; i < nbPairs; i++)
 	{
 		//extract contant info from current contact-pair 
 		const PxContactPair& curContactPair = pairs[i];
-		PxU32 nbContacts = curContactPair.extractContacts(contacts, buff);
+		//PxU32 nbContacts = curContactPair.extractContacts(contacts, buff);
 		if (curContactPair.events & PxPairFlag::eNOTIFY_TOUCH_FOUND)
 		{
-			if (pairs->shapes[0]->getGeometryType() == PxGeometryType::eBOX && pairs->shapes[1]->getGeometryType() == PxGeometryType::eSPHERE)
+			PxFilterData filterData_1 = curContactPair.shapes[0]->getSimulationFilterData();
+			PxFilterData filterData_2 = curContactPair.shapes[1]->getSimulationFilterData();
+			if (filterData_1.word0 == FilterGroup::eInteract || filterData_2.word0 == FilterGroup::eInteract)
 			{
-				PxRigidActor* box = pairHeader.actors[0];
-				PxRigidActor* sphere = pairHeader.actors[1];
-				if (std::find(boxesJoint.begin(), boxesJoint.end(), box) == boxesJoint.end())
+				//if (pairs->shapes[0]->getGeometryType() == PxGeometryType::eBOX && pairs->shapes[1]->getGeometryType() == PxGeometryType::eSPHERE)
+				//{
+				//	PxRigidActor* box = pairHeader.actors[0];
+				//	PxRigidActor* sphere = pairHeader.actors[1];
+				//	if (std::find(boxesJoint.begin(), boxesJoint.end(), box) == boxesJoint.end())
+				//	{
+				//		boxesJoint.push_back(box);
+				//		particleJoint.push_back(sphere);
+				//	}
+				//} else
+				if (pairs->shapes[1]->getGeometryType() == PxGeometryType::eBOX && pairs->shapes[0]->getGeometryType() == PxGeometryType::eSPHERE)
 				{
-					boxesJoint.push_back(box);
-					particleJoint.push_back(sphere);
+					PxRigidActor* box = pairHeader.actors[1];
+					PxRigidActor* sphere = pairHeader.actors[0];
+					if (std::find(boxesJoint.begin(), boxesJoint.end(), box) == boxesJoint.end())
+					{
+						boxesJoint.push_back(box);
+						particleJoint.push_back(sphere);
+					}
 				}
 			}
-			else if (pairs->shapes[1]->getGeometryType() == PxGeometryType::eBOX && pairs->shapes[0]->getGeometryType() == PxGeometryType::eSPHERE)
-			{
-				PxRigidActor* box = pairHeader.actors[1];
-				PxRigidActor* sphere = pairHeader.actors[0];
-				if (std::find(boxesJoint.begin(), boxesJoint.end(), box) == boxesJoint.end())
-				{
-					boxesJoint.push_back(box);
-					particleJoint.push_back(sphere);
-				}
-			}
+
 		}
 
 		//for (PxU32 j = 0; j < nbContacts; j++)

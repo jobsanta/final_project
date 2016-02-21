@@ -2,7 +2,7 @@
 #include "stdafx.h"
 #include "helper.h"
 
-void RtoQ(double a[3][3], double* q)
+void RtoQ(float a[3][3], float* q)
 {
 	float trace = a[0][0] + a[1][1] + a[2][2];
 	if (trace > 0) {// I changed M_EPSILON to 0

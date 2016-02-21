@@ -92,6 +92,7 @@
     <ClInclude Include="lightshaderclass.h" />
     <ClInclude Include="modelclass.h" />
     <ClInclude Include="nvStereo.h" />
+    <ClInclude Include="physxHelper.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="smooth_filter.h" />
     <ClInclude Include="stdafx.h" />
@@ -110,6 +111,7 @@
     <ClCompile Include="lightshaderclass.cpp" />
     <ClCompile Include="modelclass.cpp" />
     <ClCompile Include="nvStereo.cpp" />
+    <ClCompile Include="physxHelper.cpp" />
     <ClCompile Include="smooth_filter.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

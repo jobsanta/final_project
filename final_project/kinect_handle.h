@@ -31,6 +31,7 @@
 #include <vector>
 #include <PxVisualDebuggerExt.h>
 
+#include "physxHelper.h"
 #include "tracker.h"
 
 
@@ -53,15 +54,6 @@ struct Particle
 	float Depth;
 };
 
-struct FilterGroup
-{
-	enum Enum
-	{
-		ePARTICLE = (1 << 0),
-	};
-};
-
-
 class KinectHandle
 {
 	static const int        cDepthWidth = 512;
@@ -73,11 +65,8 @@ class KinectHandle
 	static const int		factor = 3;
 	static const int		num_particle_pso = 64;
 	static const int		num_generation_pso = 30;
-
-
-
-
-
+	
+	
 public: 
 	// Kinect
 	IKinectSensor*     m_pKinectSensor;
@@ -103,6 +92,7 @@ public:
 	bool m_bColorReceived;
 	bool m_bNearMode;
 	bool m_bPaused;
+	bool firstRun;
 
 	// Kinect reader
 	IColorFrameReader*     m_pColorFrameReader;
@@ -167,9 +157,6 @@ private:
 	float								face_z;
 
 	Tracker* tracker;
-
-	void setupFiltering(PxRigidActor* actor, PxU32 filterGroup, PxU32 filterMask);
-
 };
 
 

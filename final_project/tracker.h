@@ -39,13 +39,14 @@ class Tracker
 {
 public:
 	D3DXVECTOR4* handTrack();
-	bool headTrack(Point3d &p3d);
+	bool headTrack(Point3f &p3d);
 	bool detectHand();
 	Tracker();
 	~Tracker();
 	void setKinectParameter(int depthWidth, int depthHeight, int colorWidth, int colorHeight,
 		USHORT nMinDistance, USHORT nMaxDistance, UINT16* depthBuffer, RGBQUAD* colorBuffer, ICoordinateMapper* coodinateMapper);
 	void reset();
+	int returnFrameCount();
 
 
 private:
@@ -73,6 +74,9 @@ private:
 	Point rh_d;
 	bool firstRun;
 	int frame;
+	float cos_deg;
+	float sin_deg;
+	float tan_deg;
 	
 
 	CameraSpacePoint* depthToCamera_points;
@@ -87,8 +91,8 @@ private:
 	bool detected_finger[6] ;
 	Mat xyFingerSegmented;
 
-	vector<Point3d> fingerDirection;
-	vector<Point3d> fingerTipPosition;
+	vector<Point3f> fingerDirection;
+	vector<Point3f> fingerTipPosition;
 
 	Point3d palmCenter;
 	double palmEnergy;
@@ -97,7 +101,7 @@ private:
 	Mat globalRotate;
 	Mat globalRotateReverse;
 
-	double m[3][3];
+	float m[3][3];
 
 	bool detectedHandRight = false;
 	bool detectedPalm = false;
@@ -116,14 +120,20 @@ private:
 	vector<Point> findExtremePoint(Mat img_hand);
 	void findXYFingerSegment(vector<Point> extremePointList, Mat &img_blackwhite, ushort hand_depth, Point2f rh_d);
 	void findZFingerSegment(Mat img_depthHand, Point2f rh_d);
-	void pcaPalm(Mat img_depthHand, Point2f rh_d);
-	void pcaFinger(Point2f rh_d);
+	void pcaPalm(Mat img_depthHand, Point2f rh_d, Mat color);
+	void pcaFinger(Point2f rh_d, Mat color);
 	void calculateFingerRotation(Point3d finger_direction, float* rpitch, float* rroll);
 	void assignFingerTip(int finger_index, Point3d fingertipDirection, Mat global_rotate, float* suggestPosition);
 	float compareHand(float* HandParameter, Mat& depthMap, Point Handcenter, Mat& dist, CameraSpacePoint* HandSurface, D3DXVECTOR4* HandModel, bool optimizing);
 	void handEncoding(float* HandParameter, D3DXVECTOR4* output);
 	float* optimized(float inputConfig[27], float suggestConfig[27], Point HandPosition_depth, Mat depthMap, Mat dist, CameraSpacePoint* HandSurface, bool UseSuggestion);
 	void gradient(D3DXVECTOR4* HandSurface, D3DXVECTOR4* HandOut, float* outputParameter);
+
+	void cameraToWorldSpace(CameraSpacePoint camPoint, float* x, float*y, float*z);
+	void worldtoCameraSpace(CameraSpacePoint &camPoint, float x, float y, float z);
+
+	void drawAxis(Mat& img, Point p, Point q, Scalar colour, const float scale);
+
 
 
 };

@@ -12,8 +12,6 @@ static const float c_FaceTextLayoutOffsetY = -0.125f;
 static const float particleSize = 0.1f;
 static const float particleRadius = 0.01f;
 
-static const float height = 0.95f;
-static const float degree = 65.0f;
 static const float interact_limit_y = 5.0f; // in 10 CM
 static const float interact_limit_y2 = 0.1f; // in 10 CM
 static const float interact_limit_Z = -5.0f;
@@ -61,6 +59,7 @@ KinectHandle::KinectHandle()
 	m_pBackgroundRGBX = new RGBQUAD[cColorWidth * cColorHeight];
 
 	gotFace = false;
+	firstRun = true;
 	
 
 	// create heap storage for the coorinate mapping from color to depth
@@ -178,20 +177,6 @@ HRESULT KinectHandle::CreateFirstConnected()
 
 }
 
-void KinectHandle::setupFiltering(PxRigidActor* actor, PxU32 filterGroup, PxU32 filterMask)
-{
-	PxFilterData filterData;
-	filterData.word0 = filterGroup; // word0 = own ID
-	filterData.word1 = filterMask;  // word1 = ID mask to filter pairs that trigger a contact callback;
-	const PxU32 numShapes = actor->getNbShapes();
-	PxShape* shapes[2];
-	actor->getShapes(shapes, 2);
-	for (PxU32 i = 0; i < numShapes; i++)
-	{
-		PxShape* shape = shapes[i];
-		shape->setSimulationFilterData(filterData);
-	}
-}
 
 HRESULT KinectHandle::KinectProcess()
 {
@@ -338,11 +323,11 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 	{
 		tracker->setKinectParameter(nDepthWidth, nDepthHeight, nColorWidth, nColorHeight, nMinDistance, nMaxDistance, pDepthBuffer, pColorBuffer, m_pCoordinateMapper);
 		
-		Point3d headPoint;
+		Point3f headPoint;
 		if (tracker->headTrack(headPoint))
 		{
 			face_x = headPoint.x*10.0;
-			face_y = headPoint.y*10.0 + 10;
+			face_y = headPoint.y*10.0;
 			face_z = headPoint.z*10.0;
 		}
 		DepthSpacePoint headPoint_depth;
@@ -412,6 +397,7 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 			//DepthSpacePoint* depthPoints = new DepthSpacePoint[48];
 			D3DXVECTOR4* output = new D3DXVECTOR4[48];
 			output = tracker->handTrack();
+			//tracker->handTrack();
 			//CameraSpacePoint* spacePoint = new CameraSpacePoint[48];
 			//Mat bw, dist;
 			//cv::threshold(segmented, bw, 100, 255, CV_THRESH_BINARY_INV | CV_THRESH_OTSU);
@@ -464,21 +450,36 @@ void KinectHandle::ProcessFrame(INT64 nTime,
 					{
 						shapes[nShapes]->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
 					}
-					
-					PxRigidDynamic* newParticleActorJoint = CreateSphere(PxVec3(output[i].x, output[i].y, output[i].z), particleSize, 1.0f);
-					((PxRigidBody*)newParticleActorJoint)->setMass(100);
-					newParticleActorJoint->setActorFlag(PxActorFlag::eDISABLE_GRAVITY,true);
-					
-					setupFiltering(newParticleActorJoint, FilterGroup::ePARTICLE, FilterGroup::ePARTICLE);
-					
-					PxDistanceJoint* joint = PxDistanceJointCreate(*gPhysicsSDK, newParticleActor, PxTransform(PxVec3(0.0, 0.0, 0.0)), newParticleActorJoint, PxTransform(PxVec3(0.0, 0.0, 0.0)));
-					joint->setDamping(100.0);
-					joint->setStiffness(1000.0f);
-					joint->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
 
 					proxyParticle.push_back(newParticle);
 					proxyParticleActor.push_back(newParticleActor);
+
+					
+
+					PxRigidDynamic* newParticleActorJoint = CreateSphere(PxVec3(output[i].x, output[i].y, output[i].z), particleSize, 1.0f);
+					((PxRigidBody*)newParticleActorJoint)->setMass(1);
+					newParticleActorJoint->setActorFlag(PxActorFlag::eDISABLE_GRAVITY, true);
+
+					if (i >= 16 && i <= 21)
+					setupFiltering(newParticleActorJoint, FilterGroup::eInteract, FilterGroup::ePARTICLE | FilterGroup::eInteract);
+					else
+					{
+						setupFiltering(newParticleActorJoint, FilterGroup::ePARTICLE, FilterGroup::eInteract | FilterGroup:: ePARTICLE);
+					}
+
+
+					PxDistanceJoint* joint = PxDistanceJointCreate(*gPhysicsSDK, newParticleActor, PxTransform(PxVec3(0.0, 0.0, 0.0)), newParticleActorJoint, PxTransform(PxVec3(0.0, 0.0, 0.0)));
+					joint->setMaxDistance(0.01f);
+					//joint->setDamping(0.5);
+					joint->setStiffness(1000.0f);
+					joint->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
+					joint->setDistanceJointFlag(PxDistanceJointFlag::eMAX_DISTANCE_ENABLED, true);
+
+					//PxFixedJoint* joint = PxFixedJointCreate(*gPhysicsSDK, newParticleActor, PxTransform(PxVec3(0.0, 0.0, 0.0)), newParticleActorJoint, PxTransform(PxVec3(0.0, 0.0, 0.0)));
+
 					proxyParticleJoint.push_back(newParticleActorJoint);
+					
+
 				}
 			}
 			else // otherwise updated it
@@ -1160,9 +1161,20 @@ HRESULT KinectHandle::UpdateBodyData(IBody** ppBodies, IMultiSourceFrame* pMulti
 
 void KinectHandle::getFaceResult(float* x, float* y , float* z)
 {
-	*x = face_x ;
-	*y = face_y ;
-	*z = face_z ;
+	if (firstRun)
+	{
+		*x = 0.0;
+		*z = -5;
+		*y = 2.5f;
+		firstRun = false;
+	}
+	else
+	{
+		*x = face_x;
+		*y = face_y;
+		*z = face_z;
+	}
+
 }
 
 

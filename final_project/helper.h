@@ -1,2 +1,3 @@
 #include<cmath>
-void RtoQ(double a[3][3], double* q);
+
+void RtoQ(float a[3][3], float* q);
