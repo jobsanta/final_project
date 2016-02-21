@@ -17,10 +17,14 @@
 #include "d3dUtil.h"
 #include <iostream>
 
+#include "physxHelper.h"
+
 #include <Optional\DXUTShapes.h>
 
-#include "Box.h"
-
+//#include "Box.h"
+#include "modelclass.h"
+#include "lightclass.h"
+#include "lightshaderclass.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d10.lib")
@@ -29,6 +33,7 @@
 #include "nvapi.h"
 #pragma comment(lib, "nvapi.lib")
 #include "terrainclass.h"
+#include "textureclass.h"
 
 #include <tchar.h>
 #include "nvStereo.h"
@@ -41,7 +46,7 @@ class Graphic : public PxSimulationEventCallback
 {
 public:
 
-	float BoxSize = 0.5f;
+	
 
 	Graphic();
 	~Graphic();
@@ -64,6 +69,7 @@ private:
 	float                        g_EyeSeparation;
 	float                        g_Separation;
 	float                        g_Convergence;
+	float						 g_CameraDistance;
 	nv::StereoParametersD3D10    g_StereoParamD3D10;
 
 	// Directx and Effect
@@ -84,6 +90,7 @@ private:
 	ID3D10EffectTechnique*      mTech_Sphere;
 	ID3D10EffectMatrixVariable* mfxWVPVar_Sphere;
 	ID3D10EffectScalarVariable* mfxCameraDistance_Sphere;
+	ID3D10EffectVectorVariable* mfxColor_Sphere;
 
 	ID3D10InputLayout*          mVertexLayout;
 
@@ -98,7 +105,7 @@ private:
 	PxFoundation*             gFoundation = NULL;
 
 	PxScene*              gScene = NULL;
-	PxReal                myTimestep = 1.0f / 60.0f;
+	PxReal                myTimestep = 1.0f / 30.0f;
 	vector<PxRigidActor*> boxes;
 	vector<PxRigidActor*> proxyParticle;
 	vector<PxRigidActor*> boxesJoint;
@@ -110,10 +117,15 @@ private:
 
 	PxVisualDebuggerConnection* theConnection;
 
-	Box          mBox;
 	TerrainClass terrain;
+	ModelClass* m_Model;
+	LightShaderClass* m_LightShader;
+	LightClass* m_Light;
 
 	ID3DX10Mesh* sphere;
+	long long start_time = 0;
+	long long oldTimeSinceStart = 0;
+	float mAccumulator = 0;
 
 
 	void       buildFX();
@@ -123,13 +135,15 @@ private:
 	void       StepPhysX();
 	D3DXMATRIX PxtoXMMatrix(PxTransform input);
 	void       DrawBox(PxShape* pShape, PxRigidActor* actor);
-	void	   DrawSphere(PxShape* pShape, PxRigidActor* actor);
+	void	   DrawSphere(PxRigidActor* actor, int index);
 	void       DrawShape(PxShape* shape, PxRigidActor* actor);
 	void       DrawActor(PxRigidActor* actor);
 	void       RenderActors(bool);
 	bool       CreateDevice(HWND);
 	void       FreeDevice();
 	
+
+	long long milliseconds_now();
 
 
 

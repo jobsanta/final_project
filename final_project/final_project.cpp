@@ -17,7 +17,9 @@ TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 float currentX = 0;
 float currentY = 0;
 float currentZ = 0;
-float speed = 0.05f;
+float last_x = 0;
+float last_y = 0;
+float last_z = 0;
 
 Graphic g_graphic;
 KinectHandle kinect_handle;
@@ -62,8 +64,9 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		return 0;
 	}
 
-	//ShowWindow(hWnd, nCmdShow);
-	//UpdateWindow(hWnd);
+	// Full Screen commented this
+	ShowWindow(hWnd, nCmdShow);
+	UpdateWindow(hWnd);
 
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_FINAL_PROJECT));
 
@@ -98,6 +101,11 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	currentX = x;
 	currentY = y;
 	currentZ = z;
+	float step = 0.01;
+
+	float last_x = currentX;
+	float last_y = currentY;
+	float last_z = currentZ;
 	// Main message loop
 	msg = { 0 };
 	while (WM_QUIT != msg.message)
@@ -112,10 +120,16 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			HRESULT hr = kinect_handle.KinectProcess();
 			vector<PxRigidActor*> proxyParticleActor = kinect_handle.getProxyParticle();
 			kinect_handle.getFaceResult(&x, &y, &z);
+		
+			currentX = step*x + (1.0f-step)*last_x;
+			currentY = step*y + (1.0f-step)*last_y;
+			currentZ = step*z + (1.0f-step)*last_z;
+
+			last_x = currentX;
+			last_y = currentY;
+			last_z = currentZ;
+
 			
-			currentX = smooth_x.update(x);
-			currentY = smooth_y.update(y);
-			currentZ = smooth_z.update(z);
 
 
 			g_graphic.SetProxyActor(proxyParticleActor);
